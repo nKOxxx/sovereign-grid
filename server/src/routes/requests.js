@@ -15,6 +15,9 @@ import { z } from 'zod'
 import { requireRole } from '../middleware/roles.js'
 import { requireAuth } from '../middleware/auth.js'
 import { withUser } from '../db/pool.js'
+import { normalizeListing, normalizeRequest, quoteView } from '../domain/normalize.js'
+import { computeCosts } from '../domain/calculator.js'
+import { matchAll } from '../domain/score.js'
 
 const requestSchema = z.object({
   name: z.string().trim().min(1).max(200),
@@ -101,6 +104,111 @@ export function createRequestsRouter({ pool }) {
         return
       }
       res.status(200).json({ request: rows[0] })
+    } catch (err) {
+      next(err)
+    }
+  })
+
+  // ---- matches: normalize + score + filter + evidence-driven disqualify ----
+  // GET /api/requests/:id/matches  (owner buyer or operator)
+  //   Loads the request and every ACTIVE listing through the owner-run
+  //   match_listings_for_match() read model (which carries committed_price +
+  //   evidence + facility for scoring — quotes are shown to the matched buyer).
+  //   Approved eligibility-case evidence for THIS request is merged in, so the
+  //   evidence path can flip a disqualified listing to bookable. Then matchAll
+  //   (verbatim port of src/lib/market.js) reproduces the demo's scores.
+  router.get('/:id/matches', requireRole(['buyer', 'operator']), async (req, res, next) => {
+    try {
+      const { id } = paramsId.parse(req.params)
+
+      const { request, listings } = await withUser(req.user.id, req.user.role, async (c) => {
+        const reqRes = await c.query('SELECT * FROM requests WHERE id = $1', [id])
+        if (!reqRes.rows.length) return { request: null, listings: [] }
+        const listingRes = await c.query('SELECT * FROM match_listings_for_match()')
+        return { request: reqRes.rows[0], listings: listingRes.rows.map((r) => r.listing) }
+      }, pool)
+
+      if (!request) {
+        res.status(404).json({ error: { code: 'not_found', message: 'Not found' } })
+        return
+      }
+
+      // Merge approved eligibility-case evidence for this request into the raw
+      // listing payloads BEFORE normalization so the route gate can see it.
+      // eligibility_cases is operator-internal (operator-only RLS); the
+      // SECURITY DEFINER approved_eligibility_evidence() (0004) returns ONLY the
+      // approved cases' {listing_id, evidence} for this request, so a buyer can
+      // see the evidence that unlocked a route without ever touching the case's
+      // status/missing/reason internals.
+      if (listings.length) {
+        const cases = await withUser(req.user.id, req.user.role, async (c) => {
+          return c.query(
+            'SELECT listing_id, evidence FROM approved_eligibility_evidence($1)',
+            [id],
+          )
+        }, pool)
+        const byListing = new Map()
+        for (const row of cases.rows) {
+          const arr = byListing.get(row.listing_id) || []
+          arr.push(...(Array.isArray(row.evidence) ? row.evidence : []))
+          byListing.set(row.listing_id, arr)
+        }
+        for (const raw of listings) {
+          const extra = byListing.get(raw.id)
+          if (extra && extra.length) {
+            raw.evidence = [...(Array.isArray(raw.evidence) ? raw.evidence : []), ...extra]
+          }
+        }
+      }
+
+      const normalizedRequest = normalizeRequest(request)
+      const normalizedListings = listings.map((raw) => normalizeListing(raw))
+      const result = matchAll(normalizedListings, normalizedRequest)
+
+      const toQuote = (listing) => quoteView(listing, normalizedRequest, computeCosts)
+
+      const bookable = result.offers.map((o) => {
+        const q = toQuote(o.listing)
+        return {
+          listingId: o.listing.id,
+          name: o.listing.name,
+          rank: o.rank,
+          matchScore: o.score,
+          committedPerAccelHr: q.committedPerAccelHr,
+          effectivePerAccelHr: q.effectivePerAccelHr,
+          totalContractValue: q.totalContractValue,
+          monthlyRunRate: q.monthlyRunRate,
+          commitmentValue: q.commitmentValue,
+          breakEvenUtilization: q.breakEvenUtilization,
+          componentScores: {
+            performance: o.breakdown.workloadPerformance.score,
+            sovereignty: o.breakdown.sovereignEligibility.score,
+            powerResilience: o.breakdown.resilience.score,
+          },
+          scoreBreakdown: o.breakdown,
+          explanation: o.explanation,
+        }
+      })
+
+      const disqualified = result.policyHolds.map((o) => ({
+        listingId: o.listing.id,
+        name: o.listing.name,
+        matchScore: o.score,
+        disqualifyReason: o.disqualifyReason,
+        componentScores: {
+          performance: o.breakdown.workloadPerformance.score,
+          sovereignty: o.breakdown.sovereignEligibility.score,
+          powerResilience: o.breakdown.resilience.score,
+        },
+        scoreBreakdown: o.breakdown,
+      }))
+
+      res.status(200).json({
+        request: { id: request.id, name: request.name },
+        bookable,
+        disqualified,
+        excludedByHardFilters: result.excluded.length,
+      })
     } catch (err) {
       next(err)
     }

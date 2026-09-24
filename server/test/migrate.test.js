@@ -35,7 +35,7 @@ describe('migrate', () => {
     await c.connect()
     try {
       const { rows } = await c.query('SELECT filename FROM schema_migrations')
-      expect(rows.map((r) => r.filename)).toEqual(['0001_init.sql', '0002_auth.sql'])
+      expect(rows.map((r) => r.filename)).toEqual(['0001_init.sql', '0002_auth.sql', '0003_wave_c.sql', '0004_wave_c_fix.sql'])
     } finally {
       await c.end()
     }
@@ -72,8 +72,9 @@ describe('migrate', () => {
          ORDER BY relname`,
       )
       expect(rows.map((r) => r.relname)).toEqual([
-        'approvals', 'audit_log', 'deal_parties', 'deals', 'evidence_items',
-        'listings', 'messages', 'offers', 'requests', 'sessions', 'users',
+        'approvals', 'audit_log', 'deal_parties', 'deals', 'eligibility_cases',
+        'evidence_items', 'fee_policy', 'listings', 'messages', 'offers',
+        'requests', 'sessions', 'users',
       ])
     } finally {
       await c.end()

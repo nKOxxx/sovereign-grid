@@ -21,6 +21,10 @@ import { createAuthRouter } from './routes/auth.js'
 import { createRequestsRouter } from './routes/requests.js'
 import { createListingsRouter } from './routes/listings.js'
 import { createDealsRouter } from './routes/deals.js'
+import { createMarketplaceRouter } from './routes/marketplace.js'
+import { createCalculatorRouter } from './routes/calculator.js'
+import { createFeesRouter } from './routes/fees.js'
+import { createEligibilityRouter } from './routes/eligibility.js'
 
 /**
  * @param {{pool?: import('pg').Pool, logger?: object}} [opts]
@@ -37,6 +41,12 @@ export function createApp({ pool = defaultPool, logger = console } = {}) {
   app.use('/api/requests', createRequestsRouter({ pool }))
   app.use('/api/listings', createListingsRouter({ pool }))
   app.use('/api/deals', createDealsRouter({ pool }))
+
+  // Wave C — domain API.
+  app.use('/api/marketplace', createMarketplaceRouter({ pool }))
+  app.use('/api/calculator', createCalculatorRouter({ pool }))
+  app.use('/api/fees', createFeesRouter({ pool }))
+  app.use('/api/eligibility', createEligibilityRouter({ pool }))
 
   app.use((_req, res) => {
     res.status(404).json({ error: { code: 'not_found', message: 'Not found' } })
