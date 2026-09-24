@@ -14,7 +14,12 @@
 import pg from 'pg'
 import { z } from 'zod'
 
-const { Pool } = pg
+const { Pool, types } = pg
+
+// node-pg returns numeric columns as strings; map them to JS numbers so the API
+// (prices, quantities) serializes cleanly as JSON numbers, not "2.5" strings.
+// numeric OID = 1700. NULL stays NULL.
+types.setTypeParser(1700, (v) => (v === null ? null : Number(v)))
 
 const userContextSchema = z.object({
   userId: z.string().uuid('userId must be a valid uuid'),
