@@ -1,8 +1,10 @@
 // src/screens/Calculator.jsx — Five-Year Calculator (D07, SPEC §8)
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { computeCalculator, WORKLOAD_PROFILES, workloadCostsFor, spotExposure } from '../lib/cost.js'
 import { goldenRequest, listingById, DEMO_NOTE } from '../data/seed.js'
-import { DemoBadge, Field, inputCls } from './ui.jsx'
+import { api } from '../lib/api.js'
+import { getToken } from '../lib/auth.js'
+import { DemoBadge, Field, inputCls, OfflineBadge } from './ui.jsx'
 
 // Prefill from Project Falcon (SPEC §16.2): 256x H200, 24 months.
 // Usable committed price taken from the EU (Nordic) H200 listing.
@@ -40,7 +42,9 @@ export default function Calculator() {
   const [sovereigntyPct, setSovereigntyPct] = useState(3)
   const [workloadId, setWorkloadId] = useState('70b-train')
 
-  const r = useMemo(
+  // Local computation is the always-working base — the screen renders instantly
+  // and still functions entirely offline (the Pages site has no backend).
+  const localR = useMemo(
     () =>
       computeCalculator({
         count,
@@ -57,6 +61,60 @@ export default function Calculator() {
       }),
     [count, price, onDemand, utilizationPct, termYears, setupCost, resiliencePct, sovereigntyPct, financedPct, financingRate, resalePct],
   )
+
+  // When authenticated and online, POST the inputs to the server calculator and
+  // use the authoritative returned quote (identical numbers — verbatim port).
+  // Any failure (offline, anonymous) falls back to localR with an offline badge.
+  const [serverQuote, setServerQuote] = useState(null)
+  const [apiStatus, setApiStatus] = useState('offline') // 'live' | 'offline'
+
+  useEffect(() => {
+    let active = true
+    const token = getToken()
+    if (!token) {
+      setApiStatus('offline')
+      return () => {
+        active = false
+      }
+    }
+    setApiStatus('loading')
+    api
+      .post(
+        '/calculator/quote',
+        {
+          count,
+          pricePerAccelHr: price,
+          onDemandPerAccelHr: onDemand,
+          utilization: utilizationPct / 100,
+          setupCost,
+          termYears,
+          resiliencePct,
+          sovereigntyPct,
+          financedPct,
+          financingRate,
+          resalePct,
+        },
+        { token },
+      )
+      .then((d) => {
+        if (!active) return
+        if (d && d.quote) {
+          setServerQuote(d.quote)
+          setApiStatus('live')
+        }
+      })
+      .catch(() => {
+        if (!active) return
+        setServerQuote(null)
+        setApiStatus('offline')
+      })
+    return () => {
+      active = false
+    }
+  }, [count, price, onDemand, utilizationPct, termYears, setupCost, resiliencePct, sovereigntyPct, financedPct, financingRate, resalePct])
+
+  // Use the server quote when available, otherwise the local computation.
+  const r = serverQuote || localR
 
   // SPEC §8.2 leftovers: cost per workload + spot exposure.
   const workloadCosts = useMemo(() => workloadCostsFor(r.effectivePerAccelHr), [r.effectivePerAccelHr])
@@ -77,6 +135,12 @@ export default function Calculator() {
     <div className="mx-auto max-w-6xl px-4 py-6">
       <div className="mb-2 flex items-center gap-2">
         <DemoBadge />
+        {apiStatus === 'offline' && <OfflineBadge label="illustrative — API offline" />}
+        {apiStatus === 'live' && (
+          <span className="rounded bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold tracking-wide text-emerald-700">
+            live API quote
+          </span>
+        )}
         <span className="text-xs text-slate-500">All outputs below are DEMO / illustrative — never a live market figure.</span>
       </div>
       <h1 className="text-2xl font-bold text-slate-900">Five-Year Calculator</h1>

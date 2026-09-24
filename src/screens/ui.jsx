@@ -7,6 +7,18 @@ export function DemoBadge({ label = 'DEMO DATA' }) {
   )
 }
 
+// Shown when a live-API fetch failed and the screen fell back to seed data.
+export function OfflineBadge({ label = 'illustrative data — API offline' }) {
+  return (
+    <span
+      title="Could not reach the live API; showing bundled seed data instead."
+      className="rounded bg-slate-200 px-2 py-0.5 text-[11px] font-semibold tracking-wide text-slate-700"
+    >
+      {label}
+    </span>
+  )
+}
+
 export function VerifiedPill({ listing }) {
   const l = listing || {}
   const hasEvidence = Array.isArray(l.evidence) && l.evidence.length > 0

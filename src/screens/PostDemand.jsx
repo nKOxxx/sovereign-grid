@@ -3,6 +3,9 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMarket } from '../store/MarketContext.jsx'
 import { acceleratorProfiles } from '../data/seed.js'
+import { api } from '../lib/api.js'
+import { getToken } from '../lib/auth.js'
+import { requestToPayload } from '../lib/apiMappers.js'
 import { DemoBadge, Field, inputCls } from './ui.jsx'
 
 const ACCEL_KEYS = Object.keys(acceleratorProfiles)
@@ -45,7 +48,7 @@ export default function PostDemand() {
     })
   }
 
-  function submit(e) {
+  async function submit(e) {
     e.preventDefault()
     const request = {
       id: `req-${Date.now()}`,
@@ -82,6 +85,18 @@ export default function PostDemand() {
       budget: { monthly: null, total: null, label: 'demo — internal budget, not disclosed to sellers' },
       privacy: { discloseBudget: false, discloseIdentity: false },
       tags: ['demo', 'user-created'],
+    }
+    // When authenticated, publish to the live API; on any failure fall back to
+    // the in-app (seed) store so posting still works with the backend down.
+    const token = getToken()
+    if (token) {
+      try {
+        await api.post('/requests', requestToPayload(request), { token })
+        navigate('/')
+        return
+      } catch {
+        // fall through to local state
+      }
     }
     addRequest(request)
     navigate('/')

@@ -1,9 +1,12 @@
 // src/screens/MarketplaceHome.jsx
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMarket } from '../store/MarketContext.jsx'
 import { acceleratorProfiles } from '../data/seed.js'
-import { DemoBadge, VerifiedPill } from './ui.jsx'
+import { api } from '../lib/api.js'
+import { getToken } from '../lib/auth.js'
+import { marketplaceRowToListing, requestRowToCard } from '../lib/apiMappers.js'
+import { DemoBadge, OfflineBadge, VerifiedPill } from './ui.jsx'
 
 const VENDOR_OPTIONS = ['All vendors', 'NVIDIA', 'AMD', 'Huawei', 'Google']
 const REGION_OPTIONS = ['All regions', 'EU', 'UAE', 'US', 'China']
@@ -19,10 +22,50 @@ function regionOf(listing) {
 }
 
 export default function MarketplaceHome() {
-  const { listings, requests, demoNote } = useMarket()
+  const { listings: seedListings, requests: seedRequests, demoNote } = useMarket()
+  const [listings, setListings] = useState(seedListings)
+  const [requests, setRequests] = useState(seedRequests)
+  const [offline, setOffline] = useState(false)
   const [vendor, setVendor] = useState('All vendors')
   const [region, setRegion] = useState('All regions')
   const [firmness, setFirmness] = useState('All firmness')
+
+  useEffect(() => {
+    let active = true
+    setOffline(false)
+    // GET /api/marketplace (public, anonymous). Fall back to seed on failure.
+    api
+      .get('/marketplace')
+      .then((d) => {
+        if (!active) return
+        if (d && Array.isArray(d.listings) && d.listings.length > 0) {
+          setListings(d.listings.map(marketplaceRowToListing))
+        }
+      })
+      .catch(() => {
+        if (!active) return
+        setListings(seedListings)
+        setOffline(true)
+      })
+
+    // GET /api/requests (requires auth) -> demand column. Seed fallback if absent.
+    const token = getToken()
+    if (token) {
+      api
+        .get('/requests', { token })
+        .then((d) => {
+          if (!active) return
+          if (d && Array.isArray(d.requests)) setRequests(d.requests.map(requestRowToCard))
+        })
+        .catch(() => {
+          if (!active) return
+          setRequests(seedRequests)
+        })
+    }
+    return () => {
+      active = false
+    }
+  }, [seedListings, seedRequests])
 
   const filtered = useMemo(
     () =>
@@ -40,6 +83,7 @@ export default function MarketplaceHome() {
     <div className="mx-auto max-w-6xl px-4 py-6">
       <div className="mb-2 flex items-center gap-2">
         <DemoBadge />
+        {offline && <OfflineBadge />}
         <span className="text-xs text-slate-500">{demoNote}</span>
       </div>
       <h1 className="text-2xl font-bold text-slate-900">Marketplace</h1>

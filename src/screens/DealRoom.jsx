@@ -1,8 +1,10 @@
 // src/screens/DealRoom.jsx — Deal Room (D05, SPEC §12, §16.3 screen 8, §16.4)
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMarket } from '../store/MarketContext.jsx'
 import { milestoneTracker, MILESTONE_LABELS, milestoneIndex } from '../lib/deal.js'
-import { DemoBadge, inputCls } from './ui.jsx'
+import { api } from '../lib/api.js'
+import { getToken } from '../lib/auth.js'
+import { DemoBadge, inputCls, OfflineBadge } from './ui.jsx'
 
 const ROLE_STYLES = {
   buyer: { bg: 'bg-sky-50', border: 'border-sky-200', name: 'text-sky-800', align: 'self-start' },
@@ -21,21 +23,70 @@ const fmtDate = (iso) => {
 export default function DealRoom() {
   const { connection, requestConnection, approveConnection, deal } = useMarket()
 
+  // Lightweight live wiring: when authenticated, read the user's deals from the
+  // API. The rich room composite (milestones/documents/eligibility) is not
+  // served as one resource, so the seed room content stays the primary view and
+  // we surface the live deal's own status/badges when available. Falls back to
+  // seed on any failure (the Pages site has no backend).
+  const [apiStatus, setApiStatus] = useState('offline') // 'live' | 'offline' | 'loading'
+  const [liveDeals, setLiveDeals] = useState([])
+  useEffect(() => {
+    let active = true
+    const token = getToken()
+    if (!token) {
+      setApiStatus('offline')
+      return () => {
+        active = false
+      }
+    }
+    setApiStatus('loading')
+    api
+      .get('/deals', { token })
+      .then((d) => {
+        if (!active) return
+        setLiveDeals(Array.isArray(d && d.deals) ? d.deals : [])
+        setApiStatus('live')
+      })
+      .catch(() => {
+        if (!active) return
+        setLiveDeals([])
+        setApiStatus('offline')
+      })
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const liveFalcon = liveDeals.find((dl) => (dl.name || '').toLowerCase().includes('falcon'))
+
   if (connection.status !== 'approved') {
-    return <ConnectionGate status={connection.status} onRequest={() => requestConnection('eu-h200-nordics')} onApprove={approveConnection} />
+    return (
+      <ConnectionGate
+        status={connection.status}
+        apiStatus={apiStatus}
+        onRequest={() => requestConnection('eu-h200-nordics')}
+        onApprove={approveConnection}
+      />
+    )
   }
 
-  return <Room deal={deal} />
+  return <Room deal={deal} liveFalcon={liveFalcon} liveDeals={liveDeals} apiStatus={apiStatus} />
 }
 
 // ---------------------------------------------------------------------------
 // Connection-request flow gate (SPEC §16.4): Request connection -> approval state
 // ---------------------------------------------------------------------------
-function ConnectionGate({ status, onRequest, onApprove }) {
+function ConnectionGate({ status, apiStatus, onRequest, onApprove }) {
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
       <div className="mb-3 flex items-center gap-2">
         <DemoBadge />
+        {apiStatus === 'offline' && <OfflineBadge />}
+        {apiStatus === 'live' && (
+          <span className="rounded bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold tracking-wide text-emerald-700">
+            live API
+          </span>
+        )}
         <span className="text-xs text-slate-500">Deal room — connection first, then deal room (SPEC §16.4).</span>
       </div>
       <h1 className="text-2xl font-bold text-slate-900">Deal Room — Project Falcon</h1>
@@ -90,7 +141,7 @@ function ConnectionGate({ status, onRequest, onApprove }) {
 // ---------------------------------------------------------------------------
 // Deal room proper (connection approved)
 // ---------------------------------------------------------------------------
-function Room({ deal }) {
+function Room({ deal, liveFalcon, liveDeals, apiStatus }) {
   const { sendDealMessage } = useMarket()
   const [draft, setDraft] = useState('')
 
@@ -105,7 +156,7 @@ function Room({ deal }) {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6">
-      <Header deal={deal} />
+      <Header deal={deal} liveFalcon={liveFalcon} liveDeals={liveDeals} apiStatus={apiStatus} />
 
       {/* Milestone tracker (SPEC §12.2) */}
       <section className="mt-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
@@ -189,11 +240,22 @@ function Room({ deal }) {
   )
 }
 
-function Header({ deal }) {
+function Header({ deal, liveFalcon, liveDeals, apiStatus }) {
   return (
     <div className="mb-2 flex flex-wrap items-center gap-2">
       <DemoBadge />
+      {apiStatus === 'offline' && <OfflineBadge />}
+      {apiStatus === 'live' && (
+        <span className="rounded bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold tracking-wide text-emerald-700">
+          live deals: {Array.isArray(liveDeals) ? liveDeals.length : 0}
+        </span>
+      )}
       <span className="text-xs text-slate-500">Deal room — DEMO content. Statuses only; no live transaction.</span>
+      {liveFalcon && apiStatus === 'live' && (
+        <span className="rounded bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600">
+          live Falcon deal: {liveFalcon.status || '—'}
+        </span>
+      )}
       <span className="ml-auto rounded bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-800">
         negotiation: {deal.offer.status}
       </span>

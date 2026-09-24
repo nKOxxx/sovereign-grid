@@ -1,11 +1,22 @@
 // src/screens/MatchResults.jsx
-import { useMemo, useState } from 'react'
+// Normalized match results for the golden Project Falcon request.
+//
+// Wave D: when an authenticated session exists, the screen drives the Falcon
+// request through the live API — creating it via POST /api/requests if needed,
+// then reading GET /api/requests/:id/matches and rendering bookable /
+// disqualified / excluded exactly as the server computes it (93 / 90 / 87 on
+// the golden path, with Ascend disqualified on its route-condition reason).
+// If the API is unreachable (the static Pages site) or the user is anonymous,
+// it falls back to the exact same unified shape computed locally from seed
+// data, so the page always renders — never a white screen.
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMarket } from '../store/MarketContext.jsx'
-import { matchAll } from '../lib/market.js'
-import { computeCosts } from '../lib/cost.js'
-import { goldenRequest, acceleratorProfiles } from '../data/seed.js'
-import { DemoBadge } from './ui.jsx'
+import { api } from '../lib/api.js'
+import { getToken } from '../lib/auth.js'
+import { goldenRequest } from '../data/seed.js'
+import { buildUnifiedMatchesFromSeed, requestToPayload } from '../lib/apiMappers.js'
+import { DemoBadge, OfflineBadge } from './ui.jsx'
 
 const DIM_LABELS = {
   workloadPerformance: 'Workload perf.',
@@ -17,22 +28,93 @@ const DIM_LABELS = {
   evidenceConfidence: 'Evidence',
 }
 
+async function resolveFalconMatches(token) {
+  // Find an existing Falcon request, else create one from the golden demo
+  // request so the server reproduces the canonical 93/90/87 result.
+  let list
+  try {
+    list = await api.get('/requests', { token })
+  } catch {
+    throw new Error('requests unavailable')
+  }
+  const existing = (list && list.requests || []).find(
+    (r) => r && (r.name || '').toLowerCase().includes('falcon'),
+  )
+  let id = existing && existing.id
+  if (!id) {
+    const created = await api.post('/requests', requestToPayload(goldenRequest), { token })
+    id = created && created.request && created.request.id
+    if (!id) throw new Error('could not create request')
+  }
+  const matches = await api.get(`/requests/${id}/matches`, { token })
+  if (!matches) throw new Error('no matches response')
+  return {
+    request: matches.request || { id, name: goldenRequest.name },
+    bookable: matches.bookable || [],
+    disqualified: matches.disqualified || [],
+    excluded: matches.excludedByHardFilters ?? 0,
+    status: 'live',
+  }
+}
+
 export default function MatchResults() {
   const { listings } = useMarket()
   const [expanded, setExpanded] = useState(null)
 
-  const result = useMemo(() => matchAll(listings, goldenRequest), [listings])
-  const { offers, policyHolds, excluded } = result
+  // Always-available seed fallback (renders before/without network).
+  const seed = useMemo(
+    () => buildUnifiedMatchesFromSeed(listings, goldenRequest),
+    [listings],
+  )
+
+  const [data, setData] = useState(seed)
+  const [status, setStatus] = useState('offline') // 'live' | 'offline' | 'loading'
+  const requestName = (data.request && data.request.name) || goldenRequest.name
+
+  useEffect(() => {
+    let active = true
+    const token = getToken()
+    if (!token) {
+      setStatus('offline')
+      return () => {
+        active = false
+      }
+    }
+    setStatus('loading')
+    resolveFalconMatches(token)
+      .then((live) => {
+        if (!active) return
+        setData(live)
+        setStatus('live')
+      })
+      .catch(() => {
+        if (!active) return
+        setData(seed)
+        setStatus('offline')
+      })
+    return () => {
+      active = false
+    }
+  }, [seed])
+
+  const { bookable, disqualified, excluded } = data
+  const headline = goldenRequest.summary.headline
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6">
       <div className="mb-2 flex items-center gap-2">
         <DemoBadge />
-        <span className="text-xs text-slate-500">Normalized, illustrative offers — not live market data.</span>
+        {status === 'offline' && <OfflineBadge />}
+        {status === 'live' && (
+          <span className="rounded bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold tracking-wide text-emerald-700">
+            live API match
+          </span>
+        )}
+        <span className="text-xs text-slate-500">Normalized offers — ranked by Match Score (0–100).</span>
       </div>
-      <h1 className="text-2xl font-bold text-slate-900">Match Results — {goldenRequest.name}</h1>
+      <h1 className="text-2xl font-bold text-slate-900">Match Results — {requestName}</h1>
       <p className="mt-1 max-w-3xl text-sm text-slate-600">
-        {goldenRequest.summary.headline}. Offers are normalized to a complete-cost basis and ranked by Match Score
+        {headline}. Offers are normalized to a complete-cost basis and ranked by Match Score
         (0–100). Non-NVIDIA and regional accelerators are included on equal footing.
       </p>
       <ul className="mt-3 grid max-w-3xl grid-cols-1 gap-1 text-sm text-slate-600 sm:grid-cols-2">
@@ -45,7 +127,7 @@ export default function MatchResults() {
       </ul>
 
       <h2 className="mt-8 text-lg font-semibold text-slate-800">
-        Bookable offers ({offers.length})
+        Bookable offers ({bookable.length})
       </h2>
 
       <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200 shadow-sm">
@@ -63,10 +145,15 @@ export default function MatchResults() {
             </tr>
           </thead>
           <tbody>
-            {offers.map((m) => (
-              <OfferRow key={m.listing.id} m={m} expanded={expanded === m.listing.id} onToggle={() => setExpanded(expanded === m.listing.id ? null : m.listing.id)} />
+            {bookable.map((m) => (
+              <OfferRow
+                key={m.listingId}
+                m={m}
+                expanded={expanded === m.listingId}
+                onToggle={() => setExpanded(expanded === m.listingId ? null : m.listingId)}
+              />
             ))}
-            {offers.length === 0 && (
+            {bookable.length === 0 && (
               <tr>
                 <td colSpan={8} className="px-3 py-6 text-center text-slate-500">
                   No bookable offers for this request.
@@ -78,16 +165,16 @@ export default function MatchResults() {
       </div>
 
       {/* Disqualified by policy */}
-      {policyHolds.length > 0 && (
+      {disqualified.length > 0 && (
         <section className="mt-8">
-          <h2 className="text-lg font-semibold text-slate-800">Attractive offers disqualified by policy condition ({policyHolds.length})</h2>
+          <h2 className="text-lg font-semibold text-slate-800">Attractive offers disqualified by policy condition ({disqualified.length})</h2>
           <p className="mb-2 text-sm text-slate-600">
             These score well but fail an evidence-driven, route-specific eligibility condition. They are surfaced here
             transparently rather than silently dropped.
           </p>
           <div className="space-y-3">
-            {policyHolds.map((m) => (
-              <HeldCard key={m.listing.id} m={m} />
+            {disqualified.map((m) => (
+              <HeldCard key={m.listingId} m={m} />
             ))}
           </div>
         </section>
@@ -95,7 +182,7 @@ export default function MatchResults() {
 
       {/* Excluded summary */}
       <p className="mt-8 text-xs text-slate-500">
-        {excluded.length} listing{excluded.length === 1 ? '' : 's'} excluded by hard filters (location, firmness,
+        {excluded} listing{excluded === 1 ? '' : 's'} excluded by hard filters (location, firmness,
         capacity, timing, or compatibility) for this request.
       </p>
     </div>
@@ -103,38 +190,29 @@ export default function MatchResults() {
 }
 
 function OfferRow({ m, expanded, onToggle }) {
-  const l = m.listing
-  const acc = acceleratorProfiles[l.accelerator.profile] || {}
-  const nonNvidia = !/nvidia/i.test((l.accelerator.vendor || 'nvidia'))
-  const price = l.price ? l.price.committedPerAccelHr : 0
-  const cost = computeCosts({
-    count: goldenRequest.count,
-    pricePerAccelHr: price,
-    onDemandPerAccelHr: l.price ? l.price.onDemandPerAccelHr : price,
-    utilization: (goldenRequest.workload && goldenRequest.workload.utilization) || 0.65,
-    termYears: goldenRequest.termYears || 2,
-  })
-  const b = m.breakdown
+  const comp = m.componentScores || {}
+  const b = m.scoreBreakdown || {}
 
   return (
     <>
       <tr className="cursor-pointer border-b border-slate-100 hover:bg-sky-50/50" onClick={onToggle}>
         <td className="px-3 py-3">
-          <div className="font-medium text-slate-900">{l.name}</div>
-          <div className="text-xs text-slate-500">
-            {acc.model} · {l.facility.country}
-            {nonNvidia && <span className="ml-2 rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] text-indigo-700">non-NVIDIA</span>}
-          </div>
+          <div className="font-medium text-slate-900">{m.name}</div>
+          <div className="text-xs text-slate-500">{m.listingId}</div>
         </td>
-        <td className="px-3 py-3 text-slate-700">#{m.listing.rank ?? ''}</td>
-        <td className="px-3 py-3 font-medium text-slate-900">${price.toFixed(2)}</td>
-        <td className="px-3 py-3 text-slate-700">${cost.effectivePerAccelHr.toFixed(2)}</td>
-        <td className="px-3 py-3">{b.workloadPerformance.score}</td>
-        <td className="px-3 py-3">{b.sovereignEligibility.score}</td>
-        <td className="px-3 py-3">{b.resilience.score}</td>
+        <td className="px-3 py-3 text-slate-700">{typeof m.rank === 'number' ? `#${m.rank}` : ''}</td>
+        <td className="px-3 py-3 font-medium text-slate-900">
+          {typeof m.committedPerAccelHr === 'number' ? `$${m.committedPerAccelHr.toFixed(2)}` : '—'}
+        </td>
+        <td className="px-3 py-3 text-slate-700">
+          {typeof m.effectivePerAccelHr === 'number' ? `$${m.effectivePerAccelHr.toFixed(2)}` : '—'}
+        </td>
+        <td className="px-3 py-3">{comp.performance ?? '—'}</td>
+        <td className="px-3 py-3">{comp.sovereignty ?? '—'}</td>
+        <td className="px-3 py-3">{comp.powerResilience ?? '—'}</td>
         <td className="px-3 py-3">
-          <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${m.score >= 80 ? 'bg-emerald-100 text-emerald-800' : m.score >= 68 ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700'}`}>
-            {m.score}
+          <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${m.matchScore >= 80 ? 'bg-emerald-100 text-emerald-800' : m.matchScore >= 68 ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700'}`}>
+            {m.matchScore}
           </span>
         </td>
       </tr>
@@ -145,6 +223,7 @@ function OfferRow({ m, expanded, onToggle }) {
               <div>
                 <h4 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">Score breakdown</h4>
                 <div className="space-y-1.5">
+                  {Object.keys(b).length === 0 && <p className="text-sm text-slate-500">No breakdown available.</p>}
                   {Object.entries(b).map(([dim, v]) => (
                     <div key={dim} className="flex items-center gap-2 text-sm">
                       <span className="w-32 shrink-0 text-slate-600">{DIM_LABELS[dim] || dim}</span>
@@ -160,12 +239,12 @@ function OfferRow({ m, expanded, onToggle }) {
               </div>
               <div className="text-sm">
                 <h4 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">Why ranked</h4>
-                <p className="text-slate-700">{m.explanation}</p>
+                <p className="text-slate-700">{m.explanation || '—'}</p>
                 <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-600">
-                  <div>TCV (24 mo): <b>${cost.totalContractValue.toLocaleString()}</b></div>
-                  <div>Monthly run rate: <b>${cost.monthlyRunRate.toLocaleString()}</b></div>
-                  <div>Commitment value vs on-demand: <b>${cost.commitmentValue.toLocaleString()}</b></div>
-                  <div>Break-even utilization: <b>{(cost.breakEvenUtilization * 100).toFixed(0)}%</b></div>
+                  <div>TCV: <b>{typeof m.totalContractValue === 'number' ? `$${m.totalContractValue.toLocaleString()}` : '—'}</b></div>
+                  <div>Monthly run rate: <b>{typeof m.monthlyRunRate === 'number' ? `$${m.monthlyRunRate.toLocaleString()}` : '—'}</b></div>
+                  <div>Commitment value vs on-demand: <b>{typeof m.commitmentValue === 'number' ? `$${m.commitmentValue.toLocaleString()}` : '—'}</b></div>
+                  <div>Break-even utilization: <b>{typeof m.breakEvenUtilization === 'number' ? `${(m.breakEvenUtilization * 100).toFixed(0)}%` : '—'}</b></div>
                 </div>
                 <Link
                   to="/dealroom"
@@ -186,22 +265,14 @@ function OfferRow({ m, expanded, onToggle }) {
 }
 
 function HeldCard({ m }) {
-  const l = m.listing
-  const price = l.price ? l.price.committedPerAccelHr : 0
-  const acc = acceleratorProfiles[l.accelerator.profile] || {}
   return (
     <div className="rounded-lg border border-rose-200 bg-rose-50 p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h3 className="font-semibold text-rose-900">
-            {l.name}
-            {!/nvidia/i.test((l.accelerator.vendor || 'nvidia')) && (
-              <span className="ml-2 rounded bg-indigo-100 px-1.5 py-0.5 text-[11px] text-indigo-700">non-NVIDIA</span>
-            )}
-          </h3>
+          <h3 className="font-semibold text-rose-900">{m.name}</h3>
           <p className="text-xs text-rose-700">
-            {acc.model} · {l.facility.country} · <b>Match score {m.score}</b> ({DIM_LABELS.completeEconomics}{' '}
-            {m.breakdown.completeEconomics.score}, price ${price.toFixed(2)}/hr)
+            {/* eslint-disable-next-line react/no-unescaped-entities */}
+            Match score <b>{m.matchScore}</b> · {m.listingId}
           </p>
         </div>
         <span className="rounded bg-rose-600 px-2.5 py-1 text-xs font-bold text-white">DISQUALIFIED — policy condition</span>

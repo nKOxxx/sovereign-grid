@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom'
+import { useCallback, useState } from 'react'
 import { MarketProvider } from './store/MarketContext.jsx'
 import MarketplaceHome from './screens/MarketplaceHome.jsx'
 import PostDemand from './screens/PostDemand.jsx'
@@ -11,9 +12,17 @@ import CapacityPassport from './screens/CapacityPassport.jsx'
 import DealRoom from './screens/DealRoom.jsx'
 import CrmAutomation from './screens/CrmAutomation.jsx'
 import MarketIntel from './screens/MarketIntel.jsx'
+import Login from './screens/Login.jsx'
+import { getCurrentUser, logout } from './lib/auth.js'
 import { DemoBadge } from './screens/ui.jsx'
 
 export default function App() {
+  const [user, setUser] = useState(getCurrentUser())
+  const handleLogout = useCallback(async () => {
+    await logout()
+    setUser(null)
+  }, [])
+
   return (
     <MarketProvider>
       <BrowserRouter basename={import.meta.env.BASE_URL}>
@@ -54,6 +63,24 @@ export default function App() {
             <NavLink to='/intel' className={navCls}>
               Market Intel
             </NavLink>
+            <span className='ml-auto flex items-center gap-2'>
+              {user ? (
+                <span className='flex items-center gap-2 text-sm'>
+                  <span className='text-xs text-slate-500'>{user.email || user.role}</span>
+                  <button
+                    type='button'
+                    onClick={handleLogout}
+                    className='rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50'
+                  >
+                    Log out
+                  </button>
+                </span>
+              ) : (
+                <NavLink to='/login' className={navCls}>
+                  Sign in
+                </NavLink>
+              )}
+            </span>
           </nav>
           <Routes>
             <Route path='/' element={<MarketplaceHome />} />
@@ -67,6 +94,7 @@ export default function App() {
             <Route path='/dealroom' element={<DealRoom />} />
             <Route path='/crm' element={<CrmAutomation />} />
             <Route path='/intel' element={<MarketIntel />} />
+            <Route path='/login' element={<Login />} />
           </Routes>
         </div>
       </BrowserRouter>
