@@ -4,5 +4,6 @@ import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  base: process.env.DEPLOY_BASE || '/',
   test: { environment: 'node', include: ['src/**/*.test.js'] },
 })

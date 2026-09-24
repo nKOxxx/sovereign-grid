@@ -16,7 +16,7 @@ import { DemoBadge } from './screens/ui.jsx'
 export default function App() {
   return (
     <MarketProvider>
-      <BrowserRouter>
+      <BrowserRouter basename={import.meta.env.BASE_URL}>
         <div className='min-h-screen bg-slate-50'>
           <nav className='flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-slate-200 bg-white px-6 py-3'>
             <span className='mr-1 font-bold text-slate-900'>Sovereign Grid</span>
