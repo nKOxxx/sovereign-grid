@@ -1,0 +1,38 @@
+# Sovereign Grid Demo — Build Ledger (2026-09-24)
+
+Spec: Sovereign_Grid_Product_Specification_v0.4 (doc_3a841a1f5968, authoritative).
+Scope per SPEC §22.2: interactive demo of Sections 16–17, Project Falcon scenario, acceptance D01–D16.
+
+## Execution — first production fan-out of ~/hyper/orchestrator
+- Hub: Hermes (glm-4.6) — scaffold, briefs, verification, triage, commit.
+- Builder: DeepSeek-V4-Flash (hyper-deepseek) via orchestrator `dispatch-stdio` — Waves 1–3.
+- Reviewer: MiniMax-M2.7 (hyper-minimax) via orchestrator `dispatch-stdio` — adversarial spec-compliance audit.
+
+| Run | Task | Transport | Result |
+|---|---|---|---|
+| 1 | sg-wave1-001 (seed, market, cost, home/post/list/match) | stdio, attempts=2 (timeout→auto-resume) | 20/20 tests |
+| 2 | sg-wave2-001 (calculator, fee engine, eligibility, passport) | stdio, attempts=1 | 42/42 |
+| 3 | sg-wave3-001 (deal room, CRM, intel + §8.2 leftovers) | stdio, attempts=1 | 63/63 |
+| 4 | sg-mm-audit-001 (D01–D16 + §19 adversarial audit) | stdio, attempts=1 | 2×P0, 4×P1, 5×P2, all file:line verified |
+
+## Verification (hub-executed, never self-report)
+- Unit: 66/66 (incl. hub-authored payout-floor regression tests).
+- Browser: Playwright 26/26 — all 11 screens, D01–D16, zero console errors.
+- Dead-button sweep: 16 clicks / 11 routes, zero JS errors.
+- Mobile 390px: no horizontal clipping on key screens.
+- Build: vite production exit 0; lint 0 errors.
+
+## Audit triage (governance: hub grades the reviewer)
+- ACCEPTED+FIXED: sellerPayout negative-value hole (floor at 0 + 3 regression tests);
+  gcc-h200 entityVerified claim without identity evidence (evidence item added);
+  passport coverage denominator → applicable sections (listing-declarable, default all-7);
+  ConnectionGate pending-state demo badge; intel hidden-cell summary;
+  VerifiedPill null guard; "Live economics" → "Updated economics" (§19 zero-tolerance, hub override).
+- REJECTED (documented): P0×2 hardcoded deal room (latent only; single-deal demo per §22.2 —
+  multi-deal wiring does not advance Falcon); GCC zero-retention hard-filter (pipeline gives
+  compliance to eligibility engine by design — GCC-as-Conditional is the D08 exemplar);
+  eligibility dead-default (intentional defensive code, tested).
+
+## Known scope lines
+- Single-deal demo: deal room always renders the Falcon × Nordic deal (spec-scoped).
+- Test files 6; no e2e framework in repo (hub drives Playwright externally).

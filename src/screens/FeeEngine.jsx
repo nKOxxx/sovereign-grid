@@ -1,0 +1,187 @@
+// src/screens/FeeEngine.jsx — Operator Fee Engine (D06, SPEC §9)
+import { useMemo, useState } from 'react'
+import { useMarket } from '../store/MarketContext.jsx'
+import { computeFees } from '../lib/fees.js'
+import { sellerListings, DEMO_NOTE } from '../data/seed.js'
+import { DemoBadge, Field, inputCls } from './ui.jsx'
+
+const fmtHr = (n) => '$' + n.toFixed(3)
+const fmtUsd = (n) => '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 })
+const r3 = (n) => Math.round(n * 1000) / 1000
+
+export default function FeeEngine() {
+  const { platformFee, setPlatformFee } = useMarket()
+  const [sellerId, setSellerId] = useState('eu-h200-nordics')
+  const [passthrough, setPassthrough] = useState(r3(0.1))
+  const [feeBasis, setFeeBasis] = useState('pct') // 'pct' | 'perHr'
+  const [perHrFee, setPerHrFee] = useState(0.25)
+  const [feePayer, setFeePayer] = useState('buyer') // buyer | seller | split
+  const [splitPct, setSplitPct] = useState(50)
+  const [taxRate, setTaxRate] = useState(5)
+  const [partnerSplitPct, setPartnerSplitPct] = useState(30)
+  const [minMarginPct, setMinMarginPct] = useState(8)
+  const [approved, setApproved] = useState(false)
+
+  const listing = sellerListings.find((l) => l.id === sellerId) || sellerListings[0]
+  const sellerBase = listing.price.committedPerAccelHr
+
+  const fee = useMemo(
+    () =>
+      computeFees({
+        sellerBase,
+        passthrough,
+        platformFee: feeBasis === 'pct' ? platformFee : perHrFee,
+        feeBasis,
+        feePayer,
+        splitPct,
+        taxRate: taxRate / 100,
+        partnerSplitPct,
+        minMarginPct,
+      }),
+    [sellerBase, passthrough, platformFee, feeBasis, perHrFee, feePayer, splitPct, taxRate, partnerSplitPct, minMarginPct],
+  )
+
+  const showGuard = fee.needsApproval && !approved
+
+  return (
+    <div className="mx-auto max-w-6xl px-4 py-6">
+      <div className="mb-2 flex items-center gap-2">
+        <DemoBadge />
+        <span className="text-xs text-slate-500">Configurable demo fee policy — not a final commercial policy (SPEC §9.4).</span>
+      </div>
+      <h1 className="text-2xl font-bold text-slate-900">Operator Fee Engine</h1>
+      <p className="mt-1 max-w-3xl text-sm text-slate-600">
+        Set the platform fee and see buyer, seller and Sovereign Grid economics update immediately. Buyer price = seller base +
+        pass-through + buyer-paid fee + tax; seller payout = seller base − seller-paid fee (SPEC §9.2).
+      </p>
+
+      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+        {/* Fee configuration */}
+        <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-500">Fee configuration</h2>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field label="Seller / quote">
+              <select className={inputCls} value={sellerId} onChange={(e) => setSellerId(e.target.value)}>
+                {sellerListings.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Seller base price ($/accel-hr)">
+              <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">{fmtHr(sellerBase)}</div>
+            </Field>
+            <Field label="Pass-through ($/accel-hr)">
+              <input type="number" step="0.01" min={0} className={inputCls} value={passthrough} onChange={(e) => setPassthrough(r3(Number(e.target.value) || 0))} />
+            </Field>
+            <Field label="Fee basis">
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setFeeBasis('pct')} className={`flex-1 rounded-md border px-2 py-1.5 text-sm ${feeBasis === 'pct' ? 'border-sky-600 bg-sky-600 text-white' : 'border-slate-300 bg-white text-slate-700'}`}>
+                  % of price
+                </button>
+                <button type="button" onClick={() => setFeeBasis('perHr')} className={`flex-1 rounded-md border px-2 py-1.5 text-sm ${feeBasis === 'perHr' ? 'border-sky-600 bg-sky-600 text-white' : 'border-slate-300 bg-white text-slate-700'}`}>
+                  $/accel-hr
+                </button>
+              </div>
+            </Field>
+            {feeBasis === 'pct' ? (
+              <Field label={`Platform fee (${(platformFee * 100).toFixed(1)}%)`}>
+                <input type="range" min={0} max={40} step={0.5} className="w-full accent-sky-600" value={platformFee * 100} onChange={(e) => setPlatformFee(Number(e.target.value) / 100)} />
+              </Field>
+            ) : (
+              <Field label="Fee ($/accel-hr)">
+                <input type="number" step="0.01" min={0} className={inputCls} value={perHrFee} onChange={(e) => setPerHrFee(Number(e.target.value) || 0)} />
+              </Field>
+            )}
+            <Field label="Fee payer">
+              <select className={inputCls} value={feePayer} onChange={(e) => setFeePayer(e.target.value)}>
+                <option value="buyer">Buyer pays</option>
+                <option value="seller">Seller pays</option>
+                <option value="split">Split</option>
+              </select>
+            </Field>
+            {feePayer === 'split' && (
+              <Field label={`Buyer's share of fee (${splitPct}%)`}>
+                <input type="range" min={0} max={100} className="w-full accent-sky-600" value={splitPct} onChange={(e) => setSplitPct(Number(e.target.value))} />
+              </Field>
+            )}
+            <Field label="Tax rate (%)">
+              <input type="number" step="0.5" min={0} className={inputCls} value={taxRate} onChange={(e) => setTaxRate(Number(e.target.value) || 0)} />
+            </Field>
+            <Field label="Partner split (%)">
+              <input type="number" step="5" min={0} max={100} className={inputCls} value={partnerSplitPct} onChange={(e) => setPartnerSplitPct(Math.max(0, Math.min(100, Number(e.target.value) || 0)))} />
+            </Field>
+            <Field label="Minimum margin (%)">
+              <input type="number" step="0.5" min={0} className={inputCls} value={minMarginPct} onChange={(e) => setMinMarginPct(Number(e.target.value) || 0)} />
+            </Field>
+          </div>
+        </section>
+
+        {/* Live economics */}
+        <section className="rounded-lg border border-amber-200 bg-amber-50/40 p-5 shadow-sm">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Updated economics</h2>
+            <span className="rounded bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-800">demo</span>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Stat label="Seller price (base)" value={fmtHr(fee.sellerPayout)} note="seller payout" />
+            <Stat label="Buyer price" value={fmtHr(fee.buyerPrice)} note="incl. fee + tax" />
+            <Stat label="Platform gross revenue" value={fmtUsd(fee.platformGross * 730)} note={`$${fmtHr(fee.platformGross)} / accel-hr`} />
+            <Stat label="Partner share (gross)" value={fmtUsd(fee.partner * 730)} note={`$${fmtHr(fee.partner)} / accel-hr`} />
+          </div>
+
+          <div className="mt-4 space-y-1.5 border-t border-amber-200 pt-3 text-xs text-slate-600">
+            <div className="flex justify-between"><span>Seller payout</span><b>{fmtHr(fee.sellerPayout)} / accel-hr</b></div>
+            <div className="flex justify-between"><span>Buyer price</span><b>{fmtHr(fee.buyerPrice)} / accel-hr</b></div>
+            <div className="flex justify-between"><span>Platform net (after partner split)</span><b>{fmtUsd(fee.platformNet * 730)} / mo</b></div>
+            <div className="flex justify-between"><span>Operator gross margin</span><b className={fee.pass ? 'text-emerald-700' : 'text-rose-700'}>{fee.marginPct.toFixed(1)}%</b></div>
+          </div>
+
+          {/* Margin guard (SPEC §9.3) */}
+          {showGuard ? (
+            <div className="mt-4 rounded-md border border-rose-300 bg-rose-50 p-3 text-sm">
+              <p className="font-semibold text-rose-800">Margin exception — below minimum {minMarginPct}%</p>
+              <p className="mt-1 text-xs text-rose-700">
+                This quote is below the operator minimum margin ({fee.marginPct.toFixed(1)}%). It cannot be published until an
+                authorized operator approves the exception.
+              </p>
+              <button
+                type="button"
+                onClick={() => setApproved(true)}
+                className="mt-3 rounded-md bg-rose-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-rose-700"
+              >
+                Approve exception (operator)
+              </button>
+            </div>
+          ) : fee.needsApproval && approved ? (
+            <div className="mt-4 rounded-md border border-emerald-300 bg-emerald-50 p-3 text-sm">
+              <p className="font-semibold text-emerald-800">Exception approved by operator</p>
+              <p className="mt-1 text-xs text-emerald-700">
+                Below-minimum margin override recorded. Original rule, override and approver are retained on the audit record
+                (SPEC §9.3).
+              </p>
+            </div>
+          ) : (
+            <div className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+              <p className="font-semibold">Margin OK</p>
+              <p className="mt-0.5 text-xs text-emerald-700">Above the {minMarginPct}% minimum — this quote can be published.</p>
+            </div>
+          )}
+        </section>
+      </div>
+      <p className="mt-4 text-xs text-slate-400">{DEMO_NOTE}</p>
+    </div>
+  )
+}
+
+function Stat({ label, value, note }) {
+  return (
+    <div className="rounded-md border border-amber-200 bg-white p-3">
+      <div className="text-[10px] font-semibold uppercase tracking-wide text-amber-700">demo</div>
+      <div className="mt-0.5 text-xs text-slate-500">{label}</div>
+      <div className="text-lg font-bold text-slate-900">{value}</div>
+      {note && <div className="text-[11px] text-slate-400">{note}</div>}
+    </div>
+  )
+}
