@@ -42,14 +42,29 @@ async function listMigrationFiles() {
 }
 
 /**
- * Return a connection string that resolves to the schema-owner role. node-pg
- * lets the username embedded in the connection string win over a config `user`
- * override, so we rewrite the URL itself: strip any existing userinfo and force
- * sg_migrate (schema owner). Password is never carried (socket trust auth).
+ * Resolve the migration connection.
+ *
+ * Local infra: DATABASE_URL carries no password (socket trust auth) and the
+ * schema-owner role is sg_migrate — rewrite the URL to force that role.
+ * Managed Postgres (Render/Supabase/Neon/...): the URL carries its own
+ * credentials over TLS and must NOT be rewritten (the provisioning user owns
+ * the database). There we SET ROLE sg_migrate best-effort after connecting so
+ * DDL ownership matches local whenever the role exists.
  */
-export function asMigrateUrl(url) {
-  return url.replace(/^(\w+:\/\/)([^@/]*@)?/, `$1${ROLENAME}@`)
+export function migrationConnectionUrl(url) {
+  let hasPassword = false
+  try {
+    hasPassword = Boolean(new URL(url).password)
+  } catch {
+    // not a parseable URL — treat as local/socket style
+  }
+  return hasPassword
+    ? url
+    : url.replace(/^(\w+:\/\/)([^@/]*@)?/, `$1${ROLENAME}@`)
 }
+
+// Earlier revisions/tests may reference the old name.
+export const asMigrateUrl = migrationConnectionUrl
 
 /**
  * Run pending migrations against a database.
@@ -59,9 +74,25 @@ export function asMigrateUrl(url) {
 export async function migrate({ url = process.env.DATABASE_URL, log = console.log } = {}) {
   if (!url) throw new Error('DATABASE_URL is not set')
 
-  const client = new Client({ connectionString: asMigrateUrl(url) })
+  let hasPassword = false
+  try {
+    hasPassword = Boolean(new URL(url).password)
+  } catch {
+    // unparseable — local socket style
+  }
+  const client = new Client({ connectionString: migrationConnectionUrl(url) })
   await client.connect()
   try {
+    // Managed URL: best-effort adopt the schema-owner role (no-op when absent).
+    if (hasPassword) {
+      try {
+        await client.query(`SET ROLE ${ROLENAME}`)
+        log(`migrations running as ${ROLENAME}`)
+      } catch {
+        await client.query('RESET ROLE')
+        log('migrations running as the DATABASE_URL role (managed database)')
+      }
+    }
     // Ensure the migration ledger exists (owned by sg_migrate).
     await client.query(
       `CREATE TABLE IF NOT EXISTS schema_migrations (
