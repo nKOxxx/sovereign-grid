@@ -12,7 +12,8 @@ import { randomUUID } from 'node:crypto'
 const { Client } = pg
 
 const ADMIN_URL = process.env.SG_TEST_ADMIN_URL || 'postgresql:///postgres?host=/tmp'
-const HOST = '/tmp'
+// Socket dir locally (/tmp); CI overrides with SG_TEST_PG_HOST=localhost for TCP.
+const HOST = process.env.SG_TEST_PG_HOST || '/tmp'
 
 export const baseUrl = (db) => `postgresql:///${db}?host=${HOST}`
 export const appUrl = (db) => `postgresql://sg_app@/${db}?host=${HOST}`
