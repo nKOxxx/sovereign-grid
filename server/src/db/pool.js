@@ -30,7 +30,21 @@ export function createPool(connectionString = process.env.DATABASE_URL) {
   if (!connectionString) {
     throw new Error('DATABASE_URL is not set')
   }
-  return new Pool({ connectionString })
+  // node-postgres ignores `sslmode` in the URL (long-standing pg behavior), so
+  // managed-Postgres endpoints that REQUIRE ssl (Render, Supabase, Neon, ...)
+  // reject our plaintext handshake with "Connection terminated unexpectedly".
+  // Parse sslmode ourselves and map it onto pg's `ssl` option:
+  //   disable|allow -> no TLS; require -> TLS without CA verification;
+  //   verify-ca|verify-full -> TLS with certificate verification.
+  let ssl
+  try {
+    const mode = new URL(connectionString).searchParams.get('sslmode')
+    if (mode === 'disable' || mode === 'allow') ssl = false
+    else if (mode) ssl = { rejectUnauthorized: mode.startsWith('verify') }
+  } catch {
+    // not a parseable URL (e.g. bare socket path) — leave ssl untouched
+  }
+  return new Pool({ connectionString, ...(ssl !== undefined ? { ssl } : {}) })
 }
 
 // Module-level default pool bound to DATABASE_URL.
