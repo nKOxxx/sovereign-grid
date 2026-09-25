@@ -22,7 +22,24 @@ PG_DUMP=/opt/homebrew/opt/libpq/bin/pg_dump
 PG_RESTORE=/opt/homebrew/opt/libpq/bin/pg_restore
 PSQL=/opt/homebrew/opt/libpq/bin/psql
 REPO=/Users/ares/sovereign-grid
-RENDER_KEY=$(awk '/^  key:/{print $2; exit}' ~/.render/cli.yaml)
+RENDER_KEY=$(python3 - <<'EOF'
+import os
+try:
+    import yaml
+    print(yaml.safe_load(open(os.path.expanduser('~/.render/cli.yaml')))['api']['key'], end='')
+except ImportError:  # no pyyaml — walk only the api: block (avoids version: 1)
+    f = False
+    for line in open(os.path.expanduser('~/.render/cli.yaml')):
+        if line.startswith('api:'):
+            f = True
+            continue
+        if f and line.strip() and not line[0].isspace():
+            f = False
+        if f and 'key:' in line:
+            print(line.split('key:', 1)[1].strip(), end='')
+            break
+EOF
+)
 API=https://api.render.com/v1
 OLD_URL_FILE=/tmp/sg_render_ext.txt
 NEW_URL_FILE=/tmp/sg_render_ext_next.txt
@@ -180,7 +197,16 @@ EOF
   sleep 90
 
   HEALTH=$(curl -s -m 90 "https://sovereign-grid.fly.dev/api/health" || true)
-  echo "$HEALTH" | grep -q '"ok":true' || die "health probe failed after swap: $HEALTH"
+  if ! echo "$HEALTH" | grep -q '"ok":true'; then
+    log "health probe failed after swap ($HEALTH) — ROLLING BACK to old DB"
+    fly secrets set DATABASE_URL="$(cat "$OLD_URL_FILE")" -a "$APP" >/dev/null
+    sleep 90
+    ROLLBACK=$(curl -s -m 90 "https://sovereign-grid.fly.dev/api/health" || true)
+    echo "$ROLLBACK" | grep -q '"ok":true' \
+      && log "rollback OK — old DB serving; new DB $NEW_ID is garbage to delete" \
+      || log "ROLLBACK ALSO FAILED — manual intervention needed: fly secrets set DATABASE_URL=\$(cat $OLD_URL_FILE) -a $APP"
+    exit 1
+  fi
   log "health OK"
 
   # golden probe (read-only login is buyer; create is skipped — just probe health + login)
@@ -192,5 +218,19 @@ EOF
 case "${1:-}" in
   check) check ;;
   rotate) rotate ;;
-  *) echo "usage: $0 check|rotate"; exit 2 ;;
+  watch)
+    # Silent-when-healthy watchdog: app health + expiry days. Nonzero exit or
+    # output only on trouble — safe for a daily cron with no-agent delivery.
+    HEALTH=$(curl -s -m 90 "https://sovereign-grid.fly.dev/api/health" || true)
+    LEFT=$(days_left)
+    if ! echo "$HEALTH" | grep -q '"ok":true'; then
+      echo "SG ALERT: app unhealthy ($HEALTH) — https://sovereign-grid.fly.dev"
+      exit 1
+    fi
+    python3 -c "import sys; sys.exit(0 if float('$LEFT') > 7 else 9)" || {
+      echo "SG ALERT: Render DB expires in ${LEFT} days — run scripts/rotate_render_db.sh rotate (or add a card + upgrade in the Render dashboard)"
+      exit 9
+    }
+    ;;
+  *) echo "usage: $0 check|rotate|watch"; exit 2 ;;
 esac
