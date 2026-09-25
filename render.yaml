@@ -1,27 +1,20 @@
-# Render.com blueprint — Render alternative (see DEPLOY.md).
-# Deploy: Render dashboard -> New -> Blueprint -> point at this repo.
+# Render.com blueprint — sovereign-grid web service + (optional) fresh DB.
+# The live service (sovereign-grid-zzxu) was created via API on 2026-09-25
+# pointing at the existing DB — this file documents the equivalent definition.
+# NOTE: DATABASE_URL here references a blueprint database; the live service
+# instead points at the current DB's URL via env var (see rotate_render_db.sh).
 services:
   - type: web
     name: sovereign-grid
-    runtime: node
+    runtime: docker
     plan: free
-    rootDir: server
-    buildCommand: npm ci && cd .. && npm ci && npm run build
-    startCommand: SG_BOOT_MIGRATE=1 SG_STATIC_DIR=../dist node src/boot.js
+    dockerfilePath: ./Dockerfile
+    dockerContext: ./
     healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
         value: production
       - key: SESSION_SECRET
         generateValue: true
-      - key: CORS_ORIGINS
-        value: https://nkoxxx.github.io
       - key: DATABASE_URL
-        fromDatabase:
-          name: sovereign-grid-db
-          property: connectionString
-
-databases:
-  - name: sovereign-grid-db
-    plan: free
-    region: oregon
+        sync: false

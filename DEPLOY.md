@@ -84,14 +84,28 @@ Secrets (Fly):
   looks idle to the platform.
 - `server/src/db/pool.js` — honors `sslmode`; serving pool uses `sg_app`.
 
-## Deploy
+## Deploy (Render — primary since 2026-09-25)
+
+Live: **https://sovereign-grid-zzxu.onrender.com** (free web service
+`srv-dar8u8id0e5s73bucs30`, runtime **docker**, Dockerfile at repo root,
+auto-deploy on push to `main`). Free web services **do not expire** and need
+no card — unlike free Postgres (30-day clock) and Fly (trial ended).
 
 ```bash
-fly deploy --remote-only --app sovereign-grid   # ~5 min build
-curl -s https://sovereign-grid.fly.dev/api/health
+curl -s https://sovereign-grid-zzxu.onrender.com/api/health
 ```
 
-Secret changes and `fly deploy` both trigger a new release automatically.
+Ops notes:
+- Free web services **spin down after ~15 min idle** and cold-start in ~50 s.
+  First hit after idle may be slow; not an error.
+- `DATABASE_URL` env var points at the current DB (swap via API during
+  rotation — `scripts/rotate_render_db.sh`).
+- Trigger a manual deploy:
+  `render deploys create srv-dar8u8id0e5s73bucs30 --output json` or the API.
+
+Fly (`sovereign-grid.fly.dev`) is **retired** — trial ended 2026-09-25 and the
+machine is suspended. It still holds the same commit if a paid fallback is
+ever wanted.
 
 ## Render REST quirks (v1 API) — for future automation
 
@@ -99,35 +113,32 @@ Secret changes and `fly deploy` both trigger a new release automatically.
 - Create DB requires `version: "17"` and plan literal `free`
   (`postgres_free` → 400).
 - PATCH allow-list: **every entry needs a non-empty `description`**.
-- Service creation via REST is currently a moving target (`envSpecificDetails`
-  + `buildCommand` rejected in every documented shape); the CLI is
-  validate-only. Front door stays Fly; a Render front door would be
-  dashboard-created.
+- Service create: `POST /v1/services` with `type: web_service`, `ownerId` =
+  workspace id (`owner.id` on an existing resource — the field is `owner`, an
+  object, on reads), and **`serviceDetails.envSpecificDetails` is REQUIRED**
+  for non-static, non-docker runtimes. With runtime `docker`, supply
+  `dockerfilePath`/`dockerContext` inside `serviceDetails` instead.
+- `rootDir: server` + `dockerfilePath: ./Dockerfile` resolves to
+  `/server/Dockerfile` — keep `rootDir` unset for a root Dockerfile
+  (instant build_failed with no surfaced reason otherwise).
+- Logs API returned no rows for this service (params `startTime`/`endTime`
+  ms epoch + `ownerId` tried); the CLI (`render v2.28`) is the working path.
 - Free-tier note: Render free Postgres expires after 30 days on some accounts —
   add a card or upgrade before then to keep the DB.
 
-## Free-tier notes (Fly)
-
-- The app machine suspends when idle and **wakes on request** (40–90 s cold
-  start). Expect a rare transient 502 on the first hit after idle — not a bug.
-  Paid plan or a keepalive ping removes it.
-- Dead clusters `sovereign-grid-db` / `sovereign-grid-db2` (free managed
-  Postgres, unusable: auto-suspend) were destroyed on 2026-09-25.
-
-## DB expiry & rotation
+## DB expiry & rotation (free, automated)
 
 Render free Postgres expires 30 days after creation (API field `expiresAt`;
-current DB: 2026-10-25T07:00Z). Two options:
+current DB: 2026-10-25T07:00Z). Plan changes are NOT accepted via API
+(PATCH → 500) — a dashboard card is the paid alternative. The free path:
 
-1. **Dashboard upgrade** (needs a card on the Render account): cheapest tier
-   removes expiry. Plan changes are NOT accepted via API (PATCH → 500).
-2. **Rotation** (automated, free): `scripts/rotate_render_db.sh rotate` —
-   dumps the live DB, creates a fresh free DB (new 30-day window), provisions
-   roles, restores, swaps the Fly secret, verifies health. `check` subcommand
-   exits nonzero when ≤7 days remain (cron-watchdog friendly). Caveat: the
-   Render API only returns new-DB credentials in the **create response** (reads
-   show `connectionInfo: null`) — if a future API change drops them, the script
-   fails safely with the old DB still serving.
+`scripts/rotate_render_db.sh rotate` — dumps the live DB, creates a fresh free
+DB (new 30-day window), provisions roles, restores, swaps the app's
+`DATABASE_URL` env var, redeploys, verifies health; automatic rollback to the
+prior env var if the health probe fails. `check` exits nonzero when ≤7 days
+remain; `watch` is silent-when-healthy (cron `bd6bc7747401`, daily 09:00).
+Caveat: new-DB credentials are only returned in the **create response** — if
+the API ever drops them, the script fails safely with the old DB still serving.
 
 Pre-rotation dumps live in `backups/` (gitignored). Baseline:
 `backups/sg_prod_20260925.dump` (14 tables, verified).
