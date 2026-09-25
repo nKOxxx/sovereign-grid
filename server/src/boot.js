@@ -11,6 +11,12 @@
 //
 // Import order discipline (see db/seed.js): src/env.js must be imported before
 // the pool module constructs its default Pool.
+//
+// Resilience: on fresh deploys the private-network path to Postgres can drop
+// mid-connection (observed on Fly: Flycast severs long connections while
+// machines churn). Migrate and seed are both idempotent, so retrying the whole
+// phase with backoff converges: every retry makes forward progress or is a
+// no-op, and the serving pool is only constructed after a clean pass.
 import '../src/env.js'
 import { validateEnv } from './env.js'
 import { migrate } from './db/migrate.js'
@@ -24,13 +30,27 @@ if (missing.length > 0) {
   process.exit(1)
 }
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+
+async function migrateAndSeedWithRetry({ attempts = 12, backoffMs = 5000 } = {}) {
+  for (let i = 1; i <= attempts; i += 1) {
+    try {
+      console.log(`[boot] migrate+seed attempt ${i}/${attempts}`)
+      await migrate()
+      // seed() ends the pool it is given (documented contract — see db/seed.js),
+      // so it gets its own dedicated pool, never the serving defaultPool.
+      await seed(createPool())
+      return
+    } catch (err) {
+      console.error(`[boot] attempt ${i} failed: ${err.message}`)
+      if (i === attempts) throw err
+      await sleep(backoffMs)
+    }
+  }
+}
+
 if (process.env.SG_BOOT_MIGRATE === '1') {
-  console.log('[boot] running migrations')
-  await migrate()
-  console.log('[boot] seeding (idempotent)')
-  // seed() ends the pool it is given (documented contract — see db/seed.js),
-  // so it gets its own dedicated pool, never the serving defaultPool.
-  await seed(createPool())
+  await migrateAndSeedWithRetry()
   console.log('[boot] schema + seed ready')
 }
 
