@@ -1,9 +1,12 @@
 // src/screens/FeeEngine.jsx — Operator Fee Engine (D06, SPEC §9)
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useMarket } from '../store/MarketContext.jsx'
 import { computeFees } from '../lib/fees.js'
 import { sellerListings, DEMO_NOTE } from '../data/seed.js'
-import { DemoBadge, Field, inputCls } from './ui.jsx'
+import { DemoBadge, Field, inputCls, OfflineBadge } from './ui.jsx'
+import { useRole } from '../lib/useRole.js'
+import { getToken } from '../lib/auth.js'
+import { fetchFeePolicy, saveFeePolicy, operatorLabel } from '../lib/operator.js'
 
 const fmtHr = (n) => '$' + n.toFixed(3)
 const fmtUsd = (n) => '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 })
@@ -170,8 +173,169 @@ export default function FeeEngine() {
           )}
         </section>
       </div>
+      <PolicyPanel />
       <p className="mt-4 text-xs text-slate-400">{DEMO_NOTE}</p>
     </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Platform fee policy (SPEC §9.4): operator can GET + edit + PUT the live
+// policy; buyers/sellers see a read-only copy. Server is the authority; this
+// UI only surfaces role-appropriate controls.
+// ---------------------------------------------------------------------------
+function PolicyPanel() {
+  const { isOperator, user } = useRole()
+  const token = getToken()
+  const [policy, setPolicy] = useState({ platformFee: 0.08, feeBasis: 'pct', feePayer: 'buyer', splitPct: 50, partnerSplitPct: 30, minMarginPct: 8 })
+  const [status, setStatus] = useState(token ? 'loading' : 'offline') // loading | live | offline
+  const [dirty, setDirty] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [savedAt, setSavedAt] = useState(null)
+  const [err, setErr] = useState(null)
+
+  useEffect(() => {
+    if (!token) return
+    let active = true
+    fetchFeePolicy({ token }).then((res) => {
+      if (!active) return
+      if (res.ok && res.data && res.data.policy) {
+        setPolicy(res.data.policy)
+        setStatus('live')
+      } else {
+        setStatus('offline')
+      }
+    })
+    return () => {
+      active = false
+    }
+  }, [token])
+
+  const set = (patch) => {
+    setPolicy((p) => ({ ...p, ...patch }))
+    setDirty(true)
+    setErr(null)
+  }
+
+  const onSave = async () => {
+    if (!token) return
+    setSaving(true)
+    setErr(null)
+    setSavedAt(null)
+    const res = await saveFeePolicy(policy, { token })
+    setSaving(false)
+    if (res.ok && res.data && res.data.policy) {
+      setPolicy(res.data.policy)
+      setDirty(false)
+      setSavedAt(new Date().toISOString())
+    } else {
+      setErr(res.offline ? `${res.error} — changes were not saved (API offline).` : res.error)
+    }
+  }
+
+  const pct = Math.round((policy.platformFee || 0) * 1000) / 10
+
+  return (
+    <section className="mt-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm" data-testid="policy-panel">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Platform fee policy</h2>
+        {status === 'offline' && <OfflineBadge />}
+        {status === 'live' && (
+          <span className="rounded bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-emerald-700">live policy</span>
+        )}
+        {isOperator ? (
+          <span className="ml-auto rounded bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">operator edit</span>
+        ) : (
+          <span className="ml-auto rounded bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">read-only</span>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <Field label="Fee basis">
+          {isOperator ? (
+            <select
+              className={inputCls}
+              value={policy.feeBasis}
+              disabled={saving}
+              onChange={(e) => set({ feeBasis: e.target.value })}
+            >
+              <option value="pct">% of price</option>
+              <option value="perHr">$/accel-hr</option>
+            </select>
+          ) : (
+            <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+              {policy.feeBasis === 'perHr' ? '$/accel-hr' : '% of price'}
+            </div>
+          )}
+        </Field>
+        <Field label="Fee payer">
+          {isOperator ? (
+            <select className={inputCls} value={policy.feePayer} disabled={saving} onChange={(e) => set({ feePayer: e.target.value })}>
+              <option value="buyer">Buyer pays</option>
+              <option value="seller">Seller pays</option>
+              <option value="split">Split</option>
+            </select>
+          ) : (
+            <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm capitalize text-slate-700">{policy.feePayer}</div>
+          )}
+        </Field>
+        <Field label={`Platform fee (${pct.toFixed(1)}%)`}>
+          {isOperator ? (
+            <input
+              type="number"
+              step={0.5}
+              min={0}
+              max={40}
+              className={inputCls}
+              value={pct}
+              disabled={saving}
+              onChange={(e) => set({ platformFee: (Number(e.target.value) || 0) / 100 })}
+            />
+          ) : (
+            <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">{pct.toFixed(1)}%</div>
+          )}
+        </Field>
+      </div>
+
+      {policy.feePayer === 'split' && (
+        <div className="mt-4 max-w-xs">
+          <Field label={`Buyer's share of fee (${policy.splitPct}%)`}>
+            {isOperator ? (
+              <input
+                type="number"
+                min={0}
+                max={100}
+                className={inputCls}
+                value={policy.splitPct}
+                disabled={saving}
+                onChange={(e) => set({ splitPct: Math.min(100, Math.max(0, Number(e.target.value) || 0)) })}
+              />
+            ) : (
+              <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">{policy.splitPct}%</div>
+            )}
+          </Field>
+        </div>
+      )}
+
+      {isOperator && token && (
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={onSave}
+            disabled={!dirty || saving}
+            className="rounded-md bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {saving ? 'Saving…' : 'Save policy'}
+          </button>
+          {savedAt && (
+            <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">
+              Saved by {operatorLabel(user)} · {new Date(savedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          )}
+          {err && <span className="rounded border border-rose-300 bg-rose-50 px-2 py-0.5 text-xs font-medium text-rose-700">{err}</span>}
+        </div>
+      )}
+    </section>
   )
 }
 

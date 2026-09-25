@@ -5,6 +5,15 @@ import { milestoneTracker, MILESTONE_LABELS, milestoneIndex } from '../lib/deal.
 import { api } from '../lib/api.js'
 import { getToken } from '../lib/auth.js'
 import { DemoBadge, inputCls, OfflineBadge } from './ui.jsx'
+import { useRole } from '../lib/useRole.js'
+import {
+  DEAL_STATUS_LABELS,
+  allowedTransitions,
+  canTransitionDeal,
+  advanceDealStatus,
+  operatorLabel,
+  decisionStamp,
+} from '../lib/operator.js'
 
 const ROLE_STYLES = {
   buyer: { bg: 'bg-sky-50', border: 'border-sky-200', name: 'text-sky-800', align: 'self-start' },
@@ -198,6 +207,8 @@ function Room({ deal, liveFalcon, liveDeals, apiStatus }) {
           invoice rows below are status-only — no custody, no payment processing in the demo (SPEC §12.3).
         </p>
       </section>
+
+      <OperatorDealControls deal={deal} liveFalcon={liveFalcon} liveDeals={liveDeals} apiStatus={apiStatus} />
 
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
         {/* Left column: participants + offer + negotiation + deposits */}
@@ -463,3 +474,143 @@ function EligibilityCard({ deal }) {
     </Section>
   )
 }
+
+// ---------------------------------------------------------------------------
+// Operator deal controls (SPEC §12): advance a deal's status via PATCH
+// /api/deals/:id/status, constrained to forward-only transitions. Invalid or
+// illegal moves render a friendly inline error (never crash); every operator
+// action is reflected in the audit-trail event log with the named human
+// operator + timestamp (SPEC §19). Server enforces role — UI only gates.
+// ---------------------------------------------------------------------------
+function dealStatusOf(deal, liveFalcon, apiStatus) {
+  if (apiStatus === 'live' && liveFalcon && liveFalcon.status) return liveFalcon.status
+  const m = deal && deal.milestones && deal.milestones.current
+  return m || 'negotiating'
+}
+
+function buildSeedEvents(deal, liveFalcon, apiStatus) {
+  const ev = []
+  if (deal && deal.negotiation && Array.isArray(deal.negotiation.approvedDeviations)) {
+    for (const d of deal.negotiation.approvedDeviations) {
+      ev.push({ id: 'ev-' + d.id, at: d.approvedAt, actor: d.approver || 'Operator', text: `Approved deviation: ${d.item}` })
+    }
+  }
+  if (apiStatus === 'live' && liveFalcon && liveFalcon.status) {
+    ev.unshift({
+      id: 'ev-live',
+      at: liveFalcon.updated_at || null,
+      actor: 'Operator',
+      text: `Deal status: ${DEAL_STATUS_LABELS[liveFalcon.status] || liveFalcon.status}`,
+    })
+  } else if (deal && deal.milestones && Array.isArray(deal.milestones.achieved)) {
+    for (const a of deal.milestones.achieved) {
+      if (DEAL_STATUS_LABELS[a]) ev.push({ id: 'ev-ms-' + a, at: null, actor: 'Operator', text: `Milestone reached: ${DEAL_STATUS_LABELS[a]}` })
+    }
+  }
+  return ev
+}
+
+function OperatorDealControls({ deal, liveFalcon, liveDeals, apiStatus }) {
+  const { isOperator, user } = useRole()
+  const token = getToken()
+  const [cur, setCur] = useState(() => dealStatusOf(deal, liveFalcon, apiStatus))
+  const [events, setEvents] = useState(() => buildSeedEvents(deal, liveFalcon, apiStatus))
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState(null)
+  const [okMsg, setOkMsg] = useState(null)
+
+  if (!isOperator) return null
+
+  const next = allowedTransitions(cur)
+  const id = (liveFalcon && liveFalcon.id) || (deal && deal.id) || ''
+  const currentLabel = DEAL_STATUS_LABELS[cur] || cur
+
+  const onAdvance = async (to) => {
+    const check = canTransitionDeal(cur, to)
+    setErr(null)
+    setOkMsg(null)
+    if (!check.ok) {
+      setErr(check.error)
+      return
+    }
+    setBusy(true)
+    let live = null
+    if (token && id) live = await advanceDealStatus(id, to, { token }).catch(() => null)
+    setBusy(false)
+    const stamp = new Date().toISOString()
+    setCur(to)
+    const persisted = apiStatus === 'live' && live && live.ok
+    setEvents((prev) => [
+      {
+        id: 'ev-' + Date.now(),
+        at: stamp,
+        actor: operatorLabel(user),
+        text: `Advanced to ${DEAL_STATUS_LABELS[to]}${persisted ? ' (persisted)' : ' (applied locally)'}`,
+      },
+      ...prev,
+    ])
+    if (live && !live.ok) setErr(`${live.error} — applied locally (API offline).`)
+    else setOkMsg(`Deal moved to ${DEAL_STATUS_LABELS[to]}.`)
+  }
+
+  return (
+    <section className="mt-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm" data-testid="operator-deal-controls">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Deal status — operator</h2>
+        <span className="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">operator only</span>
+        <span className="ml-auto rounded bg-sky-100 px-2 py-0.5 text-xs font-semibold text-sky-800">Current: {currentLabel}</span>
+      </div>
+      <p className="text-xs text-slate-500">
+        Signed in as <b>{operatorLabel(user)}</b>. Advance the deal only to a valid next stage (SPEC §12); every change is
+        recorded in the audit trail below.
+      </p>
+
+      {next.length > 0 ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {next.map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => onAdvance(s)}
+              disabled={busy}
+              className="rounded-md bg-sky-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
+            >
+              {busy ? '…' : `→ ${DEAL_STATUS_LABELS[s]}`}
+            </button>
+          ))}
+          {next.includes('cancelled') && (
+            <button
+              type="button"
+              onClick={() => onAdvance('cancelled')}
+              disabled={busy}
+              className="rounded-md border border-rose-300 bg-white px-3 py-1.5 text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+            >
+              Cancel deal
+            </button>
+          )}
+        </div>
+      ) : (
+        <p className="mt-3 text-xs text-slate-500">Deal is {currentLabel} (terminal) — no further transition is valid.</p>
+      )}
+
+      {err && <p className="mt-3 rounded border border-rose-300 bg-rose-50 px-2 py-1 text-xs font-medium text-rose-700">{err}</p>}
+      {okMsg && <p className="mt-3 rounded border border-emerald-300 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-800">{okMsg}</p>}
+
+      <div className="mt-4 border-t border-slate-100 pt-3">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Audit trail</h3>
+        <ul className="mt-2 space-y-1.5">
+          {events.length === 0 && <li className="text-xs text-slate-400">No recorded events yet.</li>}
+          {events.map((e) => (
+            <li key={e.id} className="flex items-baseline justify-between gap-2 text-xs text-slate-600">
+              <span>
+                <b className="text-slate-800">{e.actor}</b> — {e.text}
+              </span>
+              <span className="shrink-0 text-slate-400">{decisionStamp(e.at)}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  )
+}
+

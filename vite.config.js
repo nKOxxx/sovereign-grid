@@ -14,5 +14,5 @@ export default defineConfig({
   base: process.env.DEPLOY_BASE || '/',
   server: { proxy },
   preview: { proxy },
-  test: { environment: 'node', include: ['src/**/*.test.js'] },
+  test: { environment: 'node', include: ['src/**/*.test.{js,jsx}'] },
 })
