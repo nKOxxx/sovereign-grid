@@ -92,3 +92,35 @@ describe('DealRoom — operator controls don not crash and stay gated', () => {
     expect(html).toContain('Deal Room')
   })
 })
+
+describe('FeeEngine — design-system guard (world-class-frontend gates)', () => {
+  const LIGHT_SLOP =
+    /bg-white|bg-slate-\d|text-slate-\d|bg-amber-\d|text-amber-\d|bg-emerald-\d|text-emerald-\d|bg-rose-\d|text-rose-\d|border-slate-\d|border-amber-\d|border-emerald-\d|border-rose-\d|border-sky-\d|bg-sky-\d|accent-sky-\d/
+
+  const renderFee = (session) => {
+    setToken('op-token', session)
+    return renderToStaticMarkup(
+      <MarketProvider>
+        <FeeEngine />
+      </MarketProvider>,
+    )
+  }
+
+  it('renders zero native <select> elements (custom Select only)', () => {
+    const html = renderFee(operator)
+    expect(html.match(/<select\b/g) || []).toHaveLength(0)
+    expect(html).toContain('role="combobox"')
+  })
+
+  it('renders zero light-theme Tailwind classes on the dark app', () => {
+    const html = renderFee(operator)
+    expect(html.match(LIGHT_SLOP) || []).toHaveLength(0)
+  })
+
+  it('figures carry the financial-product tells (sg-num / sg-card / sg-display)', () => {
+    const html = renderFee(operator)
+    expect(html).toContain('sg-num')
+    expect(html).toContain('sg-card')
+    expect(html).toContain('sg-display')
+  })
+})

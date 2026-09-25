@@ -4,6 +4,7 @@ import { useMarket } from '../store/MarketContext.jsx'
 import { computeFees } from '../lib/fees.js'
 import { sellerListings, DEMO_NOTE } from '../data/seed.js'
 import { DemoBadge, Field, inputCls, OfflineBadge } from './ui.jsx'
+import Select from '../components/Select.jsx'
 import { useRole } from '../lib/useRole.js'
 import { getToken } from '../lib/auth.js'
 import { fetchFeePolicy, saveFeePolicy, operatorLabel } from '../lib/operator.js'
@@ -20,6 +21,10 @@ import {
 const fmtHr = (n) => '$' + n.toFixed(3)
 const fmtUsd = (n) => '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 })
 const r3 = (n) => Math.round(n * 1000) / 1000
+const PAYER_LABELS = { buyer: 'Buyer pays', seller: 'Seller pays', split: 'Split' }
+const BASIS_LABELS = { pct: '% of price', perHr: '$/accel-hr' }
+const labelOf = (map, v) => map[v] ?? v
+const keyOf = (map, label) => Object.keys(map).find((k) => map[k] === label) ?? label
 
 export default function FeeEngine() {
   const { platformFee, setPlatformFee } = useMarket()
@@ -75,47 +80,46 @@ export default function FeeEngine() {
     <div className="mx-auto max-w-6xl px-4 py-6">
       <div className="mb-2 flex items-center gap-2">
         <DemoBadge />
-        <span className="text-xs text-slate-500">Configurable demo fee policy — not a final commercial policy (SPEC §9.4).</span>
+        <span className="text-xs text-text-3">Configurable demo fee policy — not a final commercial policy (SPEC §9.4).</span>
       </div>
-      <h1 className="text-2xl font-bold text-slate-900">Operator Fee Engine</h1>
-      <p className="mt-1 max-w-3xl text-sm text-slate-600">
+      <h1 className="sg-display text-2xl">Operator Fee Engine</h1>
+      <p className="mt-1 max-w-3xl text-sm text-text-2">
         Set the platform fee and see buyer, seller and Sovereign Grid economics update immediately. Buyer price = seller base +
         pass-through + buyer-paid fee + tax; seller payout = seller base − seller-paid fee (SPEC §9.2).
       </p>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         {/* Fee configuration */}
-        <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-500">Fee configuration</h2>
+        <section className="sg-card p-5">
+          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-text-3">Fee configuration</h2>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Seller / quote">
-              <select className={inputCls} value={sellerId} onChange={(e) => setSellerId(e.target.value)}>
-                {sellerListings.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.name}
-                  </option>
-                ))}
-              </select>
+              <Select
+                value={listing.name}
+                onChange={(name) => setSellerId(sellerListings.find((l) => l.name === name)?.id ?? sellerId)}
+                options={sellerListings.map((l) => l.name)}
+                label="Seller / quote"
+              />
             </Field>
             <Field label="Seller base price ($/accel-hr)">
-              <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">{fmtHr(sellerBase)}</div>
+              <div className="sg-num rounded-md border border-[color:var(--sg-border)] bg-canvas px-3 py-2 text-sm text-text-2">{fmtHr(sellerBase)}</div>
             </Field>
             <Field label="Pass-through ($/accel-hr)">
               <input type="number" step="0.01" min={0} className={inputCls} value={passthrough} onChange={(e) => setPassthrough(r3(Number(e.target.value) || 0))} />
             </Field>
             <Field label="Fee basis">
               <div className="flex gap-2">
-                <button type="button" onClick={() => setFeeBasis('pct')} className={`flex-1 rounded-md border px-2 py-1.5 text-sm ${feeBasis === 'pct' ? 'border-sky-600 bg-sky-600 text-white' : 'border-slate-300 bg-white text-slate-700'}`}>
+                <button type="button" onClick={() => setFeeBasis('pct')} className={`flex-1 rounded-md border px-2 py-1.5 text-sm ${feeBasis === 'pct' ? 'border-transparent bg-accent text-white' : 'border-[color:var(--sg-border)] bg-elevated text-text-2'}`}>
                   % of price
                 </button>
-                <button type="button" onClick={() => setFeeBasis('perHr')} className={`flex-1 rounded-md border px-2 py-1.5 text-sm ${feeBasis === 'perHr' ? 'border-sky-600 bg-sky-600 text-white' : 'border-slate-300 bg-white text-slate-700'}`}>
+                <button type="button" onClick={() => setFeeBasis('perHr')} className={`flex-1 rounded-md border px-2 py-1.5 text-sm ${feeBasis === 'perHr' ? 'border-transparent bg-accent text-white' : 'border-[color:var(--sg-border)] bg-elevated text-text-2'}`}>
                   $/accel-hr
                 </button>
               </div>
             </Field>
             {feeBasis === 'pct' ? (
               <Field label={`Platform fee (${(platformFee * 100).toFixed(1)}%)`}>
-                <input type="range" min={0} max={40} step={0.5} className="w-full accent-sky-600" value={platformFee * 100} onChange={(e) => setPlatformFee(Number(e.target.value) / 100)} />
+                <input type="range" min={0} max={40} step={0.5} className="w-full accent-accent" value={platformFee * 100} onChange={(e) => setPlatformFee(Number(e.target.value) / 100)} />
               </Field>
             ) : (
               <Field label="Fee ($/accel-hr)">
@@ -123,15 +127,16 @@ export default function FeeEngine() {
               </Field>
             )}
             <Field label="Fee payer">
-              <select className={inputCls} value={feePayer} onChange={(e) => setFeePayer(e.target.value)}>
-                <option value="buyer">Buyer pays</option>
-                <option value="seller">Seller pays</option>
-                <option value="split">Split</option>
-              </select>
+              <Select
+                value={labelOf(PAYER_LABELS, feePayer)}
+                onChange={(lbl) => setFeePayer(keyOf(PAYER_LABELS, lbl))}
+                options={Object.values(PAYER_LABELS)}
+                label="Fee payer"
+              />
             </Field>
             {feePayer === 'split' && (
               <Field label={`Buyer's share of fee (${splitPct}%)`}>
-                <input type="range" min={0} max={100} className="w-full accent-sky-600" value={splitPct} onChange={(e) => setSplitPct(Number(e.target.value))} />
+                <input type="range" min={0} max={100} className="w-full accent-accent" value={splitPct} onChange={(e) => setSplitPct(Number(e.target.value))} />
               </Field>
             )}
             <Field label="Tax rate (%)">
@@ -147,10 +152,10 @@ export default function FeeEngine() {
         </section>
 
         {/* Live economics */}
-        <section className="rounded-lg border border-amber-200 bg-amber-50/40 p-5 shadow-sm">
+        <section className="sg-card p-5">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Updated economics</h2>
-            <span className="rounded bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-800">demo</span>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-text-3">Updated economics</h2>
+            <span className="rounded bg-[color:var(--sg-warning-dim)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-warning">demo</span>
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Stat label="Seller price (base)" value={fmtHr(fee.sellerPayout)} note="seller payout" />
@@ -159,41 +164,41 @@ export default function FeeEngine() {
             <Stat label="Partner share (gross)" value={fmtUsd(fee.partner * 730)} note={`$${fmtHr(fee.partner)} / accel-hr`} />
           </div>
 
-          <div className="mt-4 space-y-1.5 border-t border-amber-200 pt-3 text-xs text-slate-600">
+          <div className="mt-4 space-y-1.5 border-t border-[color:var(--sg-border)] pt-3 text-xs text-text-3">
             <div className="flex justify-between"><span>Seller payout</span><b>{fmtHr(fee.sellerPayout)} / accel-hr</b></div>
             <div className="flex justify-between"><span>Buyer price</span><b>{fmtHr(fee.buyerPrice)} / accel-hr</b></div>
             <div className="flex justify-between"><span>Platform net (after partner split)</span><b>{fmtUsd(fee.platformNet * 730)} / mo</b></div>
-            <div className="flex justify-between"><span>Operator gross margin</span><b className={fee.pass ? 'text-emerald-700' : 'text-rose-700'}>{fee.marginPct.toFixed(1)}%</b></div>
+            <div className="flex justify-between"><span>Operator gross margin</span><b className={fee.pass ? 'text-success' : 'text-danger'}>{fee.marginPct.toFixed(1)}%</b></div>
           </div>
 
           {/* Margin guard (SPEC §9.3) */}
           {showGuard ? (
-            <div className="mt-4 rounded-md border border-rose-300 bg-rose-50 p-3 text-sm">
-              <p className="font-semibold text-rose-800">Margin exception — below minimum {minMarginPct}%</p>
-              <p className="mt-1 text-xs text-rose-700">
+            <div className="mt-4 rounded-md border border-[color:var(--sg-danger)] bg-[color:var(--sg-danger-dim)] p-3 text-sm">
+              <p className="font-semibold text-danger">Margin exception — below minimum {minMarginPct}%</p>
+              <p className="mt-1 text-xs text-text-2">
                 This quote is below the operator minimum margin ({fee.marginPct.toFixed(1)}%). It cannot be published until an
                 authorized operator approves the exception.
               </p>
               <button
                 type="button"
                 onClick={() => setApproved(true)}
-                className="mt-3 rounded-md bg-rose-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-rose-700"
+                className="sg-btn mt-3 bg-[color:var(--sg-danger)] px-3 py-1.5 font-semibold text-white hover:opacity-90"
               >
                 Approve exception (operator)
               </button>
             </div>
           ) : fee.needsApproval && approved ? (
-            <div className="mt-4 rounded-md border border-emerald-300 bg-emerald-50 p-3 text-sm">
-              <p className="font-semibold text-emerald-800">Exception approved by operator</p>
-              <p className="mt-1 text-xs text-emerald-700">
+            <div className="mt-4 rounded-md border border-[color:var(--sg-success)] bg-[color:var(--sg-success-dim)] p-3 text-sm">
+              <p className="font-semibold text-success">Exception approved by operator</p>
+              <p className="mt-1 text-xs text-text-2">
                 Below-minimum margin override recorded. Original rule, override and approver are retained on the audit record
                 (SPEC §9.3).
               </p>
             </div>
           ) : (
-            <div className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
-              <p className="font-semibold">Margin OK</p>
-              <p className="mt-0.5 text-xs text-emerald-700">Above the {minMarginPct}% minimum — this quote can be published.</p>
+            <div className="mt-4 rounded-md border border-[color:var(--sg-success)] bg-[color:var(--sg-success-dim)] p-3 text-sm">
+              <p className="font-semibold text-success">Margin OK</p>
+              <p className="mt-0.5 text-xs text-text-2">Above the {minMarginPct}% minimum — this quote can be published.</p>
             </div>
           )}
         </section>
@@ -202,9 +207,9 @@ export default function FeeEngine() {
       {/* Wave G2 — Recharts visualization section (Sovereign Grid dark theme). */}
       <section className="mt-6" aria-label="Fee engine visualization">
         <div className="mb-3 flex items-center gap-2">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Visualization</h2>
-          <span className="rounded bg-sky-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-sky-700">live</span>
-          <span className="text-xs text-slate-400">derived from the current fee configuration above</span>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-text-3">Visualization</h2>
+          <span className="sg-pill sg-pill--accent px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">live</span>
+          <span className="text-xs text-text-4">derived from the current fee configuration above</span>
         </div>
         <div className="grid gap-4 lg:grid-cols-3">
           <FeeSensitivityChart rows={sensitivity} />
@@ -214,7 +219,7 @@ export default function FeeEngine() {
       </section>
 
       <PolicyPanel />
-      <p className="mt-4 text-xs text-slate-400">{DEMO_NOTE}</p>
+      <p className="mt-4 text-xs text-text-4">{DEMO_NOTE}</p>
     </div>
   )
 }
@@ -276,47 +281,47 @@ function PolicyPanel() {
   const pct = Math.round((policy.platformFee || 0) * 1000) / 10
 
   return (
-    <section className="mt-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm" data-testid="policy-panel">
+    <section className="sg-card mt-6 p-5" data-testid="policy-panel">
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Platform fee policy</h2>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-text-3">Platform fee policy</h2>
         {status === 'offline' && <OfflineBadge />}
         {status === 'live' && (
-          <span className="rounded bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-emerald-700">live policy</span>
+          <span className="rounded bg-[color:var(--sg-success-dim)] px-2 py-0.5 text-[10px] font-semibold tracking-wide text-success">live policy</span>
         )}
         {isOperator ? (
-          <span className="ml-auto rounded bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">operator edit</span>
+          <span className="ml-auto rounded bg-elevated px-2 py-0.5 text-[10px] font-semibold text-text-3">operator edit</span>
         ) : (
-          <span className="ml-auto rounded bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">read-only</span>
+          <span className="ml-auto rounded bg-elevated px-2 py-0.5 text-[10px] font-semibold text-text-3">read-only</span>
         )}
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Field label="Fee basis">
           {isOperator ? (
-            <select
-              className={inputCls}
-              value={policy.feeBasis}
+            <Select
+              value={labelOf(BASIS_LABELS, policy.feeBasis)}
+              onChange={(lbl) => set({ feeBasis: keyOf(BASIS_LABELS, lbl) })}
+              options={Object.values(BASIS_LABELS)}
+              label="Fee basis"
               disabled={saving}
-              onChange={(e) => set({ feeBasis: e.target.value })}
-            >
-              <option value="pct">% of price</option>
-              <option value="perHr">$/accel-hr</option>
-            </select>
+            />
           ) : (
-            <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+            <div className="sg-num rounded-md border border-[color:var(--sg-border)] bg-canvas px-3 py-2 text-sm text-text-2">
               {policy.feeBasis === 'perHr' ? '$/accel-hr' : '% of price'}
             </div>
           )}
         </Field>
         <Field label="Fee payer">
           {isOperator ? (
-            <select className={inputCls} value={policy.feePayer} disabled={saving} onChange={(e) => set({ feePayer: e.target.value })}>
-              <option value="buyer">Buyer pays</option>
-              <option value="seller">Seller pays</option>
-              <option value="split">Split</option>
-            </select>
+            <Select
+              value={labelOf(PAYER_LABELS, policy.feePayer)}
+              onChange={(lbl) => set({ feePayer: keyOf(PAYER_LABELS, lbl) })}
+              options={Object.values(PAYER_LABELS)}
+              label="Fee payer"
+              disabled={saving}
+            />
           ) : (
-            <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm capitalize text-slate-700">{policy.feePayer}</div>
+            <div className="rounded-md border border-[color:var(--sg-border)] bg-canvas px-3 py-2 text-sm capitalize text-text-2">{policy.feePayer}</div>
           )}
         </Field>
         <Field label={`Platform fee (${pct.toFixed(1)}%)`}>
@@ -332,7 +337,7 @@ function PolicyPanel() {
               onChange={(e) => set({ platformFee: (Number(e.target.value) || 0) / 100 })}
             />
           ) : (
-            <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">{pct.toFixed(1)}%</div>
+            <div className="sg-num rounded-md border border-[color:var(--sg-border)] bg-canvas px-3 py-2 text-sm text-text-2">{pct.toFixed(1)}%</div>
           )}
         </Field>
       </div>
@@ -349,9 +354,9 @@ function PolicyPanel() {
                 value={policy.splitPct}
                 disabled={saving}
                 onChange={(e) => set({ splitPct: Math.min(100, Math.max(0, Number(e.target.value) || 0)) })}
-              />
-            ) : (
-              <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">{policy.splitPct}%</div>
+                />
+                ) : (
+                <div className="sg-num rounded-md border border-[color:var(--sg-border)] bg-canvas px-3 py-2 text-sm text-text-2">{policy.splitPct}%</div>
             )}
           </Field>
         </div>
@@ -363,16 +368,16 @@ function PolicyPanel() {
             type="button"
             onClick={onSave}
             disabled={!dirty || saving}
-            className="rounded-md bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className="sg-btn sg-btn--primary px-4 py-2 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {saving ? 'Saving…' : 'Save policy'}
           </button>
           {savedAt && (
-            <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">
+            <span className="rounded bg-[color:var(--sg-success-dim)] px-2 py-0.5 text-xs font-medium text-success">
               Saved by {operatorLabel(user)} · {new Date(savedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
             </span>
           )}
-          {err && <span className="rounded border border-rose-300 bg-rose-50 px-2 py-0.5 text-xs font-medium text-rose-700">{err}</span>}
+          {err && <span className="rounded border border-[color:var(--sg-danger)] bg-[color:var(--sg-danger-dim)] px-2 py-0.5 text-xs font-medium text-danger">{err}</span>}
         </div>
       )}
     </section>
@@ -381,11 +386,11 @@ function PolicyPanel() {
 
 function Stat({ label, value, note }) {
   return (
-    <div className="rounded-md border border-amber-200 bg-white p-3">
-      <div className="text-[10px] font-semibold uppercase tracking-wide text-amber-700">demo</div>
-      <div className="mt-0.5 text-xs text-slate-500">{label}</div>
-      <div className="text-lg font-bold text-slate-900">{value}</div>
-      {note && <div className="text-[11px] text-slate-400">{note}</div>}
+    <div className="rounded-md border border-[color:var(--sg-border)] bg-canvas p-3">
+      <div className="text-[10px] font-semibold uppercase tracking-wide text-text-4">demo</div>
+      <div className="mt-0.5 text-xs text-text-3">{label}</div>
+      <div className="sg-num text-lg font-bold text-text-1">{value}</div>
+      {note && <div className="text-[11px] text-text-4">{note}</div>}
     </div>
   )
 }

@@ -129,7 +129,7 @@ export function FeeSensitivityChart({ rows }) {
       </figcaption>
       <ResponsiveContainer width="100%" height={220} aria-label="Fee sensitivity chart">
         <LineChart data={rows} margin={{ top: 8, right: 8, bottom: 0, left: 4 }}>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} />
+          <CartesianGrid stroke="rgba(255, 255, 255, 0.06)" vertical={false} />
           <XAxis dataKey="feePct" tickFormatter={(v) => `${v}%`} stroke="#62666d" tickLine={false} axisLine={false} tick={{ fill: '#8a8f98', fontSize: 11 }} />
           <YAxis tickFormatter={d2} stroke="#62666d" tickLine={false} axisLine={false} width={56} tick={{ fill: '#8a8f98', fontSize: 11 }} />
           <Tooltip
@@ -157,7 +157,7 @@ export function FeeFlowBreakdown({ flow, effectivePerAccelHr }) {
       </figcaption>
       <ResponsiveContainer width="100%" height={220} aria-label="Fee flow waterfall">
         <BarChart data={flow.segments} margin={{ top: 8, right: 8, bottom: 0, left: 4 }}>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} />
+          <CartesianGrid stroke="rgba(255, 255, 255, 0.06)" vertical={false} />
           <XAxis dataKey="label" stroke="#62666d" tickLine={false} axisLine={false} tick={{ fill: '#8a8f98', fontSize: 11 }} interval={0} />
           <YAxis tickFormatter={d2} stroke="#62666d" tickLine={false} axisLine={false} width={56} tick={{ fill: '#8a8f98', fontSize: 11 }} />
           <Tooltip

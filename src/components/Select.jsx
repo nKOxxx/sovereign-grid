@@ -23,6 +23,7 @@ export default function Select({
   label,
   placeholder = 'Select…',
   className = '',
+  disabled = false,
 }) {
   const rawId = useId() || 'x'
   const uid = `sg-select-${String(rawId).replace(/[^a-zA-Z0-9_-]/g, '')}`
@@ -60,7 +61,11 @@ export default function Select({
     }
   }
 
-  const toggle = () => (openRef.current ? closePanel() : openPanel())
+  const toggle = () => {
+    if (disabled) return
+    if (openRef.current) closePanel()
+    else openPanel()
+  }
 
   const choose = (opt) => {
     closePanel()
@@ -87,6 +92,7 @@ export default function Select({
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const onTriggerKeyDown = (e) => {
+    if (disabled) return
     if (!options.length) return
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       e.preventDefault()
@@ -127,6 +133,8 @@ export default function Select({
         aria-expanded={open}
         aria-controls={panelId}
         aria-labelledby={label ? `${uid}-label` : undefined}
+        aria-disabled={disabled || undefined}
+        disabled={disabled || undefined}
         className="sg-select__trigger"
         onKeyDown={onTriggerKeyDown}
         onClick={toggle}

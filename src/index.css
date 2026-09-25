@@ -1,2 +1,8 @@
 @import "tailwindcss";
 @import "../design/tokens.css";
+
+/* Paint the canvas dark behind the app (overscroll, pre-hydration). */
+html,
+body {
+  background: var(--sg-canvas);
+}
