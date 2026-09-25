@@ -16,6 +16,8 @@
 //     leak, correlation id on responses).
 
 import express from 'express'
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 import { defaultPool } from './db/pool.js'
 import { createErrorHandler } from './lib/errors.js'
 import { securityHeaders } from './middleware/security-headers.js'
@@ -77,6 +79,20 @@ export function createApp({ pool = defaultPool, logger = console } = {}) {
   app.use('/api/calculator', createCalculatorRouter({ pool }))
   app.use('/api/fees', createFeesRouter({ pool }))
   app.use('/api/eligibility', createEligibilityRouter({ pool }))
+
+  // Single-process deploy: when SG_STATIC_DIR points at the built frontend
+  // (repo `dist/`), the API also serves it — same-origin /api, no CORS puzzle.
+  // Opt-in: unset (or dir missing) leaves API-only behavior byte-identical for
+  // dev/test/CI and Pages. API routes keep JSON 404s; anything not under /api
+  // falls back to index.html (SPA client routing).
+  const staticDir = process.env.SG_STATIC_DIR
+  if (staticDir && existsSync(join(staticDir, 'index.html'))) {
+    app.use(express.static(staticDir, { index: false, maxAge: '1h' }))
+    app.get('*', (req, res, next) => {
+      if (req.path.startsWith('/api/')) return next()
+      res.sendFile(join(staticDir, 'index.html'))
+    })
+  }
 
   app.use((_req, res) => {
     res.status(404).json({ error: { code: 'not_found', message: 'Not found' } })
