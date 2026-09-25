@@ -122,6 +122,47 @@ export function createRequestsRouter({ pool }) {
     }
   })
 
+  // ---- cleanup: operator-only request deletion (demo/test hygiene) ----
+  // DELETE /api/requests/:id  (operator only)
+  //   Deletes the request and every offer row that references it (the offers
+  //   FK is ON DELETE SET NULL, so offers are purged explicitly here).
+  //   Refuses with 409 when any referencing offer is already booked onto a
+  //   deal — deal history is never destroyed by cleanup. Audit triggers stay
+  //   live: audit_log rows written for this request are preserved by design.
+  router.delete('/:id', requireRole('operator'), async (req, res, next) => {
+    try {
+      const { id } = paramsId.parse(req.params)
+      const out = await withUser(req.user.id, req.user.role, async (c) => {
+        const exists = await c.query('SELECT 1 FROM requests WHERE id = $1', [id])
+        if (!exists.rows.length) return { status: 404 }
+        const booked = await c.query(
+          'SELECT 1 FROM offers WHERE request_id = $1 AND deal_id IS NOT NULL LIMIT 1',
+          [id],
+        )
+        if (booked.rows.length) return { status: 409 }
+        await c.query('DELETE FROM offers WHERE request_id = $1', [id])
+        const del = await c.query('DELETE FROM requests WHERE id = $1 RETURNING id', [id])
+        return { status: 200, id: del.rows[0]?.id }
+      }, pool)
+      if (out.status === 404) {
+        res.status(404).json({ error: { code: 'not_found', message: 'Not found' } })
+        return
+      }
+      if (out.status === 409) {
+        res.status(409).json({
+          error: {
+            code: 'conflict',
+            message: 'request has booked offers — deal history is not deletable',
+          },
+        })
+        return
+      }
+      res.status(200).json({ deleted: out.id })
+    } catch (err) {
+      next(err)
+    }
+  })
+
   // ---- matches: normalize + score + filter + evidence-driven disqualify ----
   // GET /api/requests/:id/matches  (owner buyer or operator)
   //   Loads the request and every ACTIVE listing through the owner-run

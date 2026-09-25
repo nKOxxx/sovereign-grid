@@ -212,6 +212,7 @@ describe('protected routes return 401 without a token (deny by default)', () => 
 describe('requests (buyer-scoped)', () => {
   let buyerA
   let buyerB
+  let opTokenReq
 
   beforeAll(async () => {
     buyerA = (await registerBuyer('reqA@sg.test')).json
@@ -254,6 +255,29 @@ describe('requests (buyer-scoped)', () => {
 
     const asA = await api('GET', `/api/requests/${reqId}`, { token: buyerA.token })
     expect(asA.status).toBe(200)
+  })
+
+  it('request delete: buyer 403, operator purges offers + request, then 404', async () => {
+    ;({ token: opTokenReq } = await createSession(ids.op, 'operator', appPool))
+    const created = await api('POST', '/api/requests', {
+      token: buyerA.token,
+      body: { name: 'deletable', count: 2, region: 'EU' },
+    })
+    expect(created.status).toBe(201)
+    const reqId = created.json.request.id
+
+    // buyer cannot delete (operator-only cleanup)
+    const asBuyer = await api('DELETE', `/api/requests/${reqId}`, { token: buyerA.token })
+    expect(asBuyer.status).toBe(403)
+
+    // operator delete succeeds and reports the id
+    const del = await api('DELETE', `/api/requests/${reqId}`, { token: opTokenReq })
+    expect(del.status).toBe(200)
+    expect(del.json.deleted).toBe(reqId)
+
+    // row is gone for the owner (RLS-scoped 404) and for the operator
+    expect((await api('GET', `/api/requests/${reqId}`, { token: buyerA.token })).status).toBe(404)
+    expect((await api('DELETE', `/api/requests/${reqId}`, { token: opTokenReq })).status).toBe(404)
   })
 })
 
