@@ -42,3 +42,10 @@ Scope per SPEC §22.2: interactive demo of Sections 16–17, Project Falcon scen
 |---|---|---|---|---|
 | sg-p1-waveG2-001 | DeepSeek V4-Flash (hyper-deepseek), attempts=1 | stdio (`scripts/dispatch-stdio.sh`) | 150/150 (+11) | 26/26 (local + D12 clean) |
 Deliverables: FeeVisualizations.jsx (fee-sensitivity curve 0–20% via real computeFees/computeCalculator, fee-flow waterfall, §22.1 partner split), fee-visualizations.css (SG dark), 11 vitest tests; FeeEngine.jsx wiring preserved (slider/RBAC/testids). Deployed: 526a331 → Render live.
+
+## Hygiene wave (2026-09-25 eve)
+| item | result |
+|---|---|
+| Demo-cleanup route | DELETE /api/requests/:id (operator-only, offers purged, deal-tied → 409); server 106/106; golden_live.py probe: 6/6 live vs prod (self-cleaned), local + Render |
+| Clean URL | Render subdomain immutable; successor service blocked by Render API 500s on POST /v1/services (their outage); retry later or custom domain |
+Deployed: 4ddd831 + docs → Render live.

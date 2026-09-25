@@ -125,6 +125,11 @@ ever wanted.
   ms epoch + `ownerId` tried); the CLI (`render v2.28`) is the working path.
 - Free-tier note: Render free Postgres expires after 30 days on some accounts —
   add a card or upgrade before then to keep the DB.
+- Subdomains are **immutable**: `PATCH /services/{id}` renames the dashboard
+  display name only; the `-zzxu` slug stays. A clean URL (custom domain, or a
+  successor service created as `sovereign-grid`) is the only fix. Successor
+  attempted 2026-09-25 ~22:30 — blocked by Render API returning 500 on
+  `POST /v1/services` (worked 12h earlier); retry when their API recovers.
 
 ## DB expiry & rotation (free, automated)
 
