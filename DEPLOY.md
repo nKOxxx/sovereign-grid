@@ -1,42 +1,115 @@
-# Sovereign Grid — Deploy (the access audit answer, 2026-09-25)
+# Sovereign Grid — Production Deployment
 
-Question was: *what accesses/sites do we need so the product can be built and
-shipped autonomously?* Answer after live verification: **one token from you.
-Everything else already existed.**
+**Live:** https://sovereign-grid.fly.dev · Fly app (iad) ↔ Render Postgres (free, oregon)
 
-## What already worked before any new access (verified by execution)
-- GitHub via `gh` CLI (nKOxxx, keyring): repo admin, Actions, Pages deploys, CI — this is what "GitHub connected" means; browser GitHub sessions are logged out (Goliath + Chrome profile both checked), and that does not matter.
-- Full local pipeline: Postgres 15, server 105 tests, frontend 139 tests, e2e 26/26, playwright, orchestrator + worker fleet.
-- Vercel CLI installed but unauthenticated; every other PaaS CLI absent; no PaaS env tokens set.
+Architecture: **one single Node process** serves both the API (`/api/*`) and the
+static SPA (`SG_STATIC_DIR`). Migrations + idempotent seed run at boot
+(`SG_BOOT_MIGRATE=1`). Postgres is the source of truth; the app connects with a
+least-privilege role (`sg_app`) bound by RLS, and boot migrations run as the
+schema-owner role (`sg_migrate`).
 
-## The one human step (pick ONE; my default = Fly.io)
-PaaS CLIs all support device-flow login — run it, open the printed URL on any
-device (phone is fine), tap "Authorize with GitHub", done. No copy-pasting of
-secrets at all.
+## Roles on a managed Postgres (Render)
 
-    # Option A (default): Fly.io
-    fly auth login            # device flow; covers app + Postgres + TLS + cert
-    bash scripts/deploy_paas.sh   # then: build -> app -> free Postgres -> secrets -> deploy -> smoke
+| Role | Login | Purpose |
+|---|---|---|
+| `<db>_user` (managed admin) | yes | provisioning only; owns nothing in `public` |
+| `sg_migrate` | NOLOGIN | owns all schema objects; boot migrates via `SET ROLE` |
+| `sg_app` | yes | runtime serving; RLS-bound, no schema CREATE |
 
-    # Option B: Render (Blueprint, zero CLI needed)
-    #   dashboard.render.com -> sign in with GitHub -> New + -> Blueprint ->
-    #   select nKOxxx/sovereign-grid -> Apply. render.yaml in repo root does the rest.
+Grant chain (applied once via psql as the admin):
 
-    # Option C: Railway (dashboard or CLI)
-    #   railway.app -> Login with GitHub -> New project -> Deploy from repo.
-    #   Needs a start command override: SG_BOOT_MIGRATE=1 SG_STATIC_DIR=<dist> node server/src/boot.js
+```sql
+CREATE ROLE sg_migrate NOLOGIN;
+CREATE ROLE sg_app LOGIN PASSWORD '<generated>';
+GRANT sg_migrate TO sovereign_grid_db_user;   -- admin may adopt owner role
+GRANT sg_migrate TO sg_app;                   -- app boot may SET ROLE sg_migrate
+GRANT CREATE ON SCHEMA public TO sg_migrate;  -- not implicit for non-owners on managed PG
+-- after first migrate/seed (objects may be admin-owned from earlier boots):
+--   ALTER TABLE/SEQUENCE/VIEW ... OWNER TO sg_migrate  (loop over pg_class)
+--   ALTER DEFAULT PRIVILEGES ... (as sg_migrate, for sg_app)
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO sg_app;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO sg_app;
+REVOKE UPDATE, DELETE, TRUNCATE ON audit_log FROM sg_app;  -- append-only
+```
 
-## Why the stack is deploy-ready in one process
-- `server/src/boot.js` + `SG_BOOT_MIGRATE=1`: boot = validate env -> migrate -> idempotent seed (golden numbers 93/90/87 guaranteed on any fresh DB) -> listen. Proven locally 2026-09-25.
-- `SG_STATIC_DIR`: the API serves the built SPA (same-origin `/api`, no CORS) while `/api` keeps JSON 404s. Proven locally; 105 server tests + 4 static-mode tests.
-- `Dockerfile` (Fly/any Docker host) and `render.yaml` (Render Blueprint incl. free Postgres) are committed.
-- GitHub Pages (current demo) stays untouched: static mode is opt-in; Pages deploy remains green (wave G1 run 36100252073).
+Also required once: `CREATE EXTENSION IF NOT EXISTS citext;` — the local
+template DB has it; fresh managed DBs do not.
 
-## Verified-not-taken-for-granted gotchas
-- `seed()` ends the pool it receives (documented contract) — boot passes it a dedicated pool, never the serving one (first live run 500'd marketplace; caught + fixed + re-proven).
-- Server requires `PORT` env explicitly (wave E strictness) — set in Dockerfile + Render config.
-- Render free tier sleeps after 15 min idle; Fly shared-cpu-1x stays up. Golden numbers must read 93/90/87 after first boot — checked in deploy script smoke step.
+Secrets (Fly):
 
-## Cost
-Free tier covers demo + GCC pilot traffic on both Fly and Render. Paid tier
-only matters when real 24/7 traffic exists (Fly ~$3-6/mo, Render $7/mo).
+- `DATABASE_URL` = `postgres://sg_app:<pw>@…render.com:5432/sovereign_grid_db?sslmode=require`
+- No admin secret lives in Fly — provisioning/migration-adjacent SQL is run by
+  an operator from a workstation with the admin URL, not from the app.
+
+## The walls (in the order they were hit)
+
+1. **Fly free managed Postgres idle-stops after ~5 min.** It ignores
+   `--autostop=off` on the machine, fires even with open connections, and
+   flycast cannot wake stopped machines (`host was not found in DNS`). The app
+   died mid-migrate on every boot. **Verdict: unusable for an always-on app —
+   we kept Render Postgres as the DB and let Fly serve HTTP.**
+2. **node-pg ignores `sslmode` in connection URLs.** A `?sslmode=require` URL
+   still connects plaintext → SSL-only Postgres kills the connection
+   ("Connection terminated unexpectedly"). `src/db/pool.js` now parses
+   `sslmode` itself and sets the `ssl` option. Applies to Render/Supabase/Neon.
+3. **Render DBs created via API ship an EMPTY IP allow list** (deny-all, even
+   localhost). PATCH it with entries that each carry a non-empty
+   `description`, or every connection black-holes at TLS.
+4. **Migration role handling assumed socket-trust.** Local `DATABASE_URL` has no
+   password and boot force-rewrote the URL to the `sg_migrate` role. On managed
+   PG the URL carries credentials and must never be rewritten;
+   `src/db/migrate.js` now only `SET ROLE`s when the URL is passwordless, with
+   best-effort `RESET ROLE` cleanup otherwise.
+5. **Managed-DB roles/grants don't exist until you create them.** Local infra
+   pre-creates `sg_migrate`/`sg_app`; 0001_init.sql does not (by design —
+   roles are infra, not schema). Provision them once per environment (SQL
+   above).
+6. **`citext` missing** on fresh managed DBs → `CREATE EXTENSION` once.
+7. **Boot-order ownership.** Any objects created by the admin during an earlier
+   failed boot are admin-owned and block `sg_migrate` migrations
+   (`permission denied for table schema_migrations`). Realign ownership once
+   (SQL above), then boot converges via its own retry loop.
+8. **API-only CSP blanked the served SPA.** `security-headers.js` shipped
+   `default-src 'none'` globally when the server was JSON-only; the
+   single-process deploy now serves HTML/assets too, so CSP is dual-mode:
+   API stays `default-src 'none'`, SPA gets a strict self-hosting policy
+   (no inline scripts, `'unsafe-inline'` styles only for Recharts/Radix
+   style injection).
+
+## Boot resilience (shipped regardless)
+
+- `server/src/boot.js` — retry-wrapped migrate+seed (12 attempts, 5 s backoff).
+  Both phases are idempotent (ledger table + `ON CONFLICT DO NOTHING` seed).
+- `server/src/db/keepalive.js` — 60 s `SELECT 1` so free-tier Postgres never
+  looks idle to the platform.
+- `server/src/db/pool.js` — honors `sslmode`; serving pool uses `sg_app`.
+
+## Deploy
+
+```bash
+fly deploy --remote-only --app sovereign-grid   # ~5 min build
+curl -s https://sovereign-grid.fly.dev/api/health
+```
+
+Secret changes and `fly deploy` both trigger a new release automatically.
+
+## Render REST quirks (v1 API) — for future automation
+
+- DB endpoint is `/postgres`, not `/databases` (404 otherwise).
+- Create DB requires `version: "17"` and plan literal `free`
+  (`postgres_free` → 400).
+- PATCH allow-list: **every entry needs a non-empty `description`**.
+- Service creation via REST is currently a moving target (`envSpecificDetails`
+  + `buildCommand` rejected in every documented shape); the CLI is
+  validate-only. Front door stays Fly; a Render front door would be
+  dashboard-created.
+- Free-tier note: Render free Postgres expires after 30 days on some accounts —
+  add a card or upgrade before then to keep the DB.
+
+## e2e
+
+Local full suite: `~/venvs/fcc/bin/python e2e/verify_demo.py` (26 checks) with
+the compose stack up. `SG_E2E_BASE` can point at a live URL; the sweep is
+read-only-by-construction (clicks only, no form submits), but demo-data writes
+should still be cleaned after manual golden runs
+(`DELETE FROM requests WHERE buyer_id = '<falcon>'`).
