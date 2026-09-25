@@ -51,6 +51,11 @@ export function createErrorHandler({ logger = console } = {}) {
       status = err.statusCode || 400
       code = err.code || 'request_failed'
       message = err.clientMessage
+    } else if (err && (err.status === 413 || err.type === 'entity.too.large')) {
+      // express.json body-limit overflow (WAVE E #5): oversized request body.
+      status = 413
+      code = 'payload_too_large'
+      message = 'Request body too large'
     }
 
     // Scan for SQL error markers: if any, we must not echo the DB message to

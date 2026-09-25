@@ -17,3 +17,22 @@ if (!process.env.DATABASE_URL && existsSync(envPath)) {
     if (m && !(m[1] in process.env)) process.env[m[1]] = m[2].replace(/^['"]|['"]$/g, '')
   }
 }
+
+// WAVE E #4 — required-env validation at boot. Pure function (reads the passed
+// env object, defaulting to process.env) so it is directly unit-testable.
+// Returns the list of missing variable names; an empty array means OK.
+//
+//   * DATABASE_URL — or any PG* var (PGHOST/PGPORT/PGUSER/...) as an
+//     alternative connection source for node-pg.
+//   * PORT — explicit listen port (index.js refuses to guess a random one).
+//
+// SESSION_TTL_DAYS is intentionally NOT required: sessions.js already defaults
+// it to 7, so its absence is safe.
+export function validateEnv(env = process.env) {
+  const missing = []
+  const hasDbConfig = Boolean(env.DATABASE_URL) || Boolean(env.PGHOST)
+  if (!hasDbConfig) missing.push('DATABASE_URL (or a PG* variable, e.g. PGHOST)')
+  if (!env.PORT) missing.push('PORT')
+  return missing
+}
+

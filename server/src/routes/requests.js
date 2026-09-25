@@ -19,6 +19,14 @@ import { normalizeListing, normalizeRequest, quoteView } from '../domain/normali
 import { computeCosts } from '../domain/calculator.js'
 import { matchAll } from '../domain/score.js'
 
+// JSONB fields map to Postgres `jsonb` columns. They MUST be objects, arrays
+// or null — a bare scalar/string would otherwise pass zod (`z.unknown`) and 500
+// deep inside pool.js.withUser with 'invalid input syntax for type json'. This
+// union rejects scalars at the zod boundary so the client gets a clean 400 with
+// the field path (WAVE E regression fix).
+const jsonbField = () =>
+  z.union([z.record(z.unknown()), z.array(z.unknown()), z.null()]).optional()
+
 const requestSchema = z.object({
   name: z.string().trim().min(1).max(200),
   company: z.string().trim().max(200).optional(),
@@ -27,16 +35,16 @@ const requestSchema = z.object({
   count: z.coerce.number().int().positive().default(1),
   node: z.string().trim().max(200).optional(),
   workload_type: z.string().trim().max(200).optional(),
-  workload: z.unknown().optional(),
-  location: z.unknown().optional(),
+  workload: jsonbField(),
+  location: jsonbField(),
   start_date: z.coerce.date().optional(),
   term_months: z.coerce.number().int().positive().optional(),
   firmness: z.string().trim().max(50).optional(),
-  resilience: z.unknown().optional(),
-  compliance: z.unknown().optional(),
-  options: z.unknown().optional(),
-  budget: z.unknown().optional(),
-  privacy: z.unknown().optional(),
+  resilience: jsonbField(),
+  compliance: jsonbField(),
+  options: jsonbField(),
+  budget: jsonbField(),
+  privacy: jsonbField(),
   region: z.string().trim().max(100).optional(),
 })
 
@@ -52,6 +60,11 @@ export function createRequestsRouter({ pool }) {
   router.post('/', requireRole('buyer'), async (req, res, next) => {
     try {
       const body = requestSchema.parse(req.body)
+      // node-pg serializes JS arrays as Postgres ARRAY literals (e.g. `{"spot"}`),
+      // which a jsonb column rejects with 'invalid input syntax for type json'.
+      // Explicitly JSON-encode every jsonb value (object/array) so pg stores it
+      // as a json document; undefined/null stay NULL.
+      const toJsonb = (v) => (v === undefined || v === null ? null : JSON.stringify(v))
       const columns = [
         'buyer_id', 'name', 'company', 'accelerator_preferred', 'accelerator_alternatives',
         'count', 'node', 'workload_type', 'workload', 'location', 'start_date',
@@ -62,10 +75,10 @@ export function createRequestsRouter({ pool }) {
         req.user.id, body.name, body.company ?? null,
         body.accelerator_preferred ?? null, body.accelerator_alternatives ?? null,
         body.count, body.node ?? null, body.workload_type ?? null,
-        body.workload ?? null, body.location ?? null, body.start_date ?? null,
-        body.term_months ?? null, body.firmness ?? null, body.resilience ?? null,
-        body.compliance ?? null, body.options ?? null, body.budget ?? null,
-        body.privacy ?? null, body.region ?? null,
+        toJsonb(body.workload), toJsonb(body.location), body.start_date ?? null,
+        body.term_months ?? null, body.firmness ?? null, toJsonb(body.resilience),
+        toJsonb(body.compliance), toJsonb(body.options), toJsonb(body.budget),
+        toJsonb(body.privacy), body.region ?? null,
       ]
       const { rows } = await withUser(req.user.id, 'buyer', async (c) => {
         const placeholders = columns.map((_, i) => `$${i + 1}`).join(', ')
