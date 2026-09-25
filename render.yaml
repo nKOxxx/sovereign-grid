@@ -1,0 +1,27 @@
+# Render.com blueprint — Render alternative (see DEPLOY.md).
+# Deploy: Render dashboard -> New -> Blueprint -> point at this repo.
+services:
+  - type: web
+    name: sovereign-grid
+    runtime: node
+    plan: free
+    rootDir: server
+    buildCommand: npm ci && cd .. && npm ci && npm run build
+    startCommand: SG_BOOT_MIGRATE=1 SG_STATIC_DIR=../dist node src/boot.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: CORS_ORIGINS
+        value: https://nkoxxx.github.io
+      - key: DATABASE_URL
+        fromDatabase:
+          name: sovereign-grid-db
+          property: connectionString
+
+databases:
+  - name: sovereign-grid-db
+    plan: free
+    region: oregon
