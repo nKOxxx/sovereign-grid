@@ -1,0 +1,69 @@
+/* src/screens/wave-g.css — Marketplace + Matches (Wave G) presentation layer.
+   Reuses the design-token classes (.sg-*); only layout + bespoke effects live
+   here (Aurora hero layer, KPI row, listing/match grids, border-beam). */
+
+.sg-mkt,
+.sg-matches { background: var(--sg-canvas); }
+
+/* --- Aurora hero (decorative, low-intensity, behind content) --- */
+.sg-hero { position: relative; }
+.sg-aurora {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.sg-hero__inner { position: relative; }
+
+/* --- KPI strip (label / big tabular number) --- */
+.sg-kpi-row {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  position: relative;
+}
+
+/* --- listing + match grids --- */
+.sg-listing-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.sg-match-grid  { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+
+/* --- stat micro-layout --- */
+.sg-stat__label { color: var(--sg-text-3); font-size: 11px; font-weight: 510; letter-spacing: 0.03em; text-transform: uppercase; }
+.sg-stat__value { color: var(--sg-text-1); font-size: 13px; }
+
+/* --- card modifiers --- */
+.sg-card--golden { border-color: var(--sg-warning); }
+.sg-card--danger { border-color: color-mix(in oklch, var(--sg-danger), transparent 40%); }
+.sg-empty { border: 1px dashed var(--sg-border); }
+
+/* --- Border beam on the #1 match card (Magic UI idiom, CSS-only).
+   Registers an animatable <angle> and rotates a short conic arc around the
+   border via a masked pseudo-element — no `motion` dependency. --- */
+@property --beam-angle { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
+.sg-beam { position: relative; isolation: isolate; }
+.sg-beam::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  padding: 1px;
+  border-radius: inherit;
+  background: conic-gradient(
+    from var(--beam-angle),
+    transparent 0deg,
+    transparent 292deg,
+    var(--sg-accent) 330deg,
+    var(--sg-accent-hover) 348deg,
+    transparent 360deg
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+          mask-composite: exclude;
+  animation: sg-beam-spin 6s linear infinite;
+  pointer-events: none;
+}
+.sg-beam > * { position: relative; z-index: 1; }
+@keyframes sg-beam-spin { to { --beam-angle: 360deg; } }
+@media (prefers-reduced-motion: reduce) {
+  .sg-beam::before { animation: none; }
+}

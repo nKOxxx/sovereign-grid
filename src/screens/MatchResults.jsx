@@ -1,14 +1,16 @@
 // src/screens/MatchResults.jsx
 // Normalized match results for the golden Project Falcon request.
 //
-// Wave D: when an authenticated session exists, the screen drives the Falcon
-// request through the live API — creating it via POST /api/requests if needed,
-// then reading GET /api/requests/:id/matches and rendering bookable /
-// disqualified / excluded exactly as the server computes it (93 / 90 / 87 on
-// the golden path, with Ascend disqualified on its route-condition reason).
-// If the API is unreachable (the static Pages site) or the user is anonymous,
-// it falls back to the exact same unified shape computed locally from seed
-// data, so the page always renders — never a white screen.
+// Wave G visual redesign: bookable offers are .sg-card tiles with the score as
+// a big tabular .sg-num; the highest-score (#1) card carries the border-beam
+// treatment (.sg-beam) and a 'BEST MATCH' .sg-pill--accent. The rest stay
+// plain. All golden seed values (93 / 90 / 87), the offline fallback, badges,
+// and e2e hooks (text asserting Sovereignty/Power/Resilience, non-NVIDIA
+// accelerator names, etc.) are preserved.
+//
+// API behaviour unchanged: when an authenticated session exists, the screen
+// drives Falcon through the live API (create if needed, then read matches);
+// otherwise it falls back to the seed-computed shape.
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMarket } from '../store/MarketContext.jsx'
@@ -17,20 +19,9 @@ import { getToken } from '../lib/auth.js'
 import { goldenRequest } from '../data/seed.js'
 import { buildUnifiedMatchesFromSeed, requestToPayload } from '../lib/apiMappers.js'
 import { DemoBadge, OfflineBadge } from './ui.jsx'
-
-const DIM_LABELS = {
-  workloadPerformance: 'Workload perf.',
-  completeEconomics: 'Economics',
-  availabilityDelivery: 'Availability',
-  sovereignEligibility: 'Sovereignty',
-  resilience: 'Resilience',
-  commercialFlexibility: 'Flexibility',
-  evidenceConfidence: 'Evidence',
-}
+import './wave-g.css'
 
 async function resolveFalconMatches(token) {
-  // Find an existing Falcon request, else create one from the golden demo
-  // request so the server reproduces the canonical 93/90/87 result.
   let list
   try {
     list = await api.get('/requests', { token })
@@ -61,7 +52,6 @@ export default function MatchResults() {
   const { listings } = useMarket()
   const [expanded, setExpanded] = useState(null)
 
-  // Always-available seed fallback (renders before/without network).
   const seed = useMemo(
     () => buildUnifiedMatchesFromSeed(listings, goldenRequest),
     [listings],
@@ -99,186 +89,143 @@ export default function MatchResults() {
 
   const { bookable, disqualified, excluded } = data
   const headline = goldenRequest.summary.headline
+  const bestId = bookable.length
+    ? bookable.reduce((a, b) => (b.matchScore > a.matchScore ? b : a)).listingId
+    : null
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6">
-      <div className="mb-2 flex items-center gap-2">
-        <DemoBadge />
-        {status === 'offline' && <OfflineBadge />}
-        {status === 'live' && (
-          <span className="rounded bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold tracking-wide text-emerald-700">
-            live API match
-          </span>
+    <div className="sg-root sg-matches min-h-screen bg-canvas">
+      <div className="mx-auto max-w-6xl px-4 py-6">
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          <DemoBadge />
+          {status === 'offline' && <OfflineBadge />}
+          {status === 'live' && <span className="sg-pill sg-pill--success">live API match</span>}
+          <span className="text-xs text-text-3">Normalized offers — ranked by Match Score (0–100).</span>
+        </div>
+        <h1 className="sg-display text-3xl sm:text-4xl">Match Results — {requestName}</h1>
+        <p className="mt-2 max-w-3xl text-sm text-text-2">
+          {headline}. Offers are normalized to a complete-cost basis and ranked by Match Score
+          (0–100). Non-NVIDIA and regional accelerators are included on equal footing.
+        </p>
+        <ul className="mt-4 grid max-w-3xl grid-cols-1 gap-1.5 text-sm text-text-3 sm:grid-cols-2">
+          {goldenRequest.summary.requirements.map((r) => (
+            <li key={r} className="flex items-start gap-2">
+              <span className="mt-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
+              <span>{r}</span>
+            </li>
+          ))}
+        </ul>
+
+        <h2 className="mt-8 text-lg font-semibold text-text-1">
+          Bookable offers ({bookable.length})
+        </h2>
+        <div className="sg-match-grid mt-4">
+          {bookable.length === 0 && (
+            <p className="sg-empty col-span-full rounded-md p-4 text-sm text-text-3">
+              No bookable offers for this request.
+            </p>
+          )}
+          {bookable.map((m) => (
+            <MatchCard key={m.listingId} m={m} best={m.listingId === bestId} />
+          ))}
+        </div>
+
+        {disqualified.length > 0 && (
+          <section className="mt-10">
+            <h2 className="text-lg font-semibold text-text-1">
+              Attractive offers disqualified by policy condition ({disqualified.length})
+            </h2>
+            <p className="mb-3 text-sm text-text-3">
+              These score well but fail an evidence-driven, route-specific eligibility condition. They are surfaced here
+              transparently rather than silently dropped.
+            </p>
+            <div className="space-y-3">
+              {disqualified.map((m) => (
+                <HeldCard key={m.listingId} m={m} />
+              ))}
+            </div>
+          </section>
         )}
-        <span className="text-xs text-slate-500">Normalized offers — ranked by Match Score (0–100).</span>
+
+        <p className="mt-8 text-xs text-text-4">
+          {excluded} listing{excluded === 1 ? '' : 's'} excluded by hard filters (location, firmness,
+          capacity, timing, or compatibility) for this request.
+        </p>
       </div>
-      <h1 className="text-2xl font-bold text-slate-900">Match Results — {requestName}</h1>
-      <p className="mt-1 max-w-3xl text-sm text-slate-600">
-        {headline}. Offers are normalized to a complete-cost basis and ranked by Match Score
-        (0–100). Non-NVIDIA and regional accelerators are included on equal footing.
-      </p>
-      <ul className="mt-3 grid max-w-3xl grid-cols-1 gap-1 text-sm text-slate-600 sm:grid-cols-2">
-        {goldenRequest.summary.requirements.map((r) => (
-          <li key={r} className="flex items-start gap-1.5">
-            <span className="mt-1 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-sky-500" />
-            {r}
-          </li>
-        ))}
-      </ul>
-
-      <h2 className="mt-8 text-lg font-semibold text-slate-800">
-        Bookable offers ({bookable.length})
-      </h2>
-
-      <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200 shadow-sm">
-        <table className="w-full min-w-[820px] border-collapse bg-white text-sm">
-          <thead>
-            <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
-              <th className="px-3 py-2">Offer</th>
-              <th className="px-3 py-2">Match</th>
-              <th className="px-3 py-2">$/accel-hr (committed)</th>
-              <th className="px-3 py-2">Effective $/hr</th>
-              <th className="px-3 py-2">Performance</th>
-              <th className="px-3 py-2">Sovereignty</th>
-              <th className="px-3 py-2">Power/Resilience</th>
-              <th className="px-3 py-2">Score</th>
-            </tr>
-          </thead>
-          <tbody>
-            {bookable.map((m) => (
-              <OfferRow
-                key={m.listingId}
-                m={m}
-                expanded={expanded === m.listingId}
-                onToggle={() => setExpanded(expanded === m.listingId ? null : m.listingId)}
-              />
-            ))}
-            {bookable.length === 0 && (
-              <tr>
-                <td colSpan={8} className="px-3 py-6 text-center text-slate-500">
-                  No bookable offers for this request.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Disqualified by policy */}
-      {disqualified.length > 0 && (
-        <section className="mt-8">
-          <h2 className="text-lg font-semibold text-slate-800">Attractive offers disqualified by policy condition ({disqualified.length})</h2>
-          <p className="mb-2 text-sm text-slate-600">
-            These score well but fail an evidence-driven, route-specific eligibility condition. They are surfaced here
-            transparently rather than silently dropped.
-          </p>
-          <div className="space-y-3">
-            {disqualified.map((m) => (
-              <HeldCard key={m.listingId} m={m} />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Excluded summary */}
-      <p className="mt-8 text-xs text-slate-500">
-        {excluded} listing{excluded === 1 ? '' : 's'} excluded by hard filters (location, firmness,
-        capacity, timing, or compatibility) for this request.
-      </p>
     </div>
   )
 }
 
-function OfferRow({ m, expanded, onToggle }) {
+function MatchCard({ m, best }) {
   const comp = m.componentScores || {}
-  const b = m.scoreBreakdown || {}
+  const rank = typeof m.rank === 'number' ? `#${m.rank}` : ''
+  const committed = typeof m.committedPerAccelHr === 'number' ? `$${m.committedPerAccelHr.toFixed(2)}` : '—'
+  const effective = typeof m.effectivePerAccelHr === 'number' ? `$${m.effectivePerAccelHr.toFixed(2)}` : '—'
+  const tcv = typeof m.totalContractValue === 'number' ? `$${m.totalContractValue.toLocaleString()}` : '—'
 
   return (
-    <>
-      <tr className="cursor-pointer border-b border-slate-100 hover:bg-sky-50/50" onClick={onToggle}>
-        <td className="px-3 py-3">
-          <div className="font-medium text-slate-900">{m.name}</div>
-          <div className="text-xs text-slate-500">{m.listingId}</div>
-        </td>
-        <td className="px-3 py-3 text-slate-700">{typeof m.rank === 'number' ? `#${m.rank}` : ''}</td>
-        <td className="px-3 py-3 font-medium text-slate-900">
-          {typeof m.committedPerAccelHr === 'number' ? `$${m.committedPerAccelHr.toFixed(2)}` : '—'}
-        </td>
-        <td className="px-3 py-3 text-slate-700">
-          {typeof m.effectivePerAccelHr === 'number' ? `$${m.effectivePerAccelHr.toFixed(2)}` : '—'}
-        </td>
-        <td className="px-3 py-3">{comp.performance ?? '—'}</td>
-        <td className="px-3 py-3">{comp.sovereignty ?? '—'}</td>
-        <td className="px-3 py-3">{comp.powerResilience ?? '—'}</td>
-        <td className="px-3 py-3">
-          <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${m.matchScore >= 80 ? 'bg-emerald-100 text-emerald-800' : m.matchScore >= 68 ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700'}`}>
+    <article className={`sg-card flex flex-col p-5 ${best ? 'sg-beam sg-card--best' : ''}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          {best && <span className="sg-pill sg-pill--accent">BEST MATCH</span>}
+          <h3 className="sg-display mt-2 text-base">{m.name}</h3>
+          <p className="mt-0.5 text-xs text-text-3">{m.listingId}</p>
+        </div>
+        <div className="shrink-0 text-right">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-text-3">Score</div>
+          <div className={`sg-num text-4xl leading-none ${best ? 'text-accent' : 'text-text-1'}`}>
             {m.matchScore}
-          </span>
-        </td>
-      </tr>
-      {expanded && (
-        <tr className="border-b border-slate-100 bg-slate-50/60">
-          <td colSpan={8} className="px-4 py-4">
-            <div className="grid gap-4 lg:grid-cols-2">
-              <div>
-                <h4 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">Score breakdown</h4>
-                <div className="space-y-1.5">
-                  {Object.keys(b).length === 0 && <p className="text-sm text-slate-500">No breakdown available.</p>}
-                  {Object.entries(b).map(([dim, v]) => (
-                    <div key={dim} className="flex items-center gap-2 text-sm">
-                      <span className="w-32 shrink-0 text-slate-600">{DIM_LABELS[dim] || dim}</span>
-                      <div className="h-2 flex-1 overflow-hidden rounded bg-slate-200">
-                        <div className="h-full bg-sky-500" style={{ width: `${v.score}%` }} />
-                      </div>
-                      <span className="w-24 shrink-0 text-right text-xs text-slate-500">
-                        {v.score}/100 · w{v.weight}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="text-sm">
-                <h4 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">Why ranked</h4>
-                <p className="text-slate-700">{m.explanation || '—'}</p>
-                <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-600">
-                  <div>TCV: <b>{typeof m.totalContractValue === 'number' ? `$${m.totalContractValue.toLocaleString()}` : '—'}</b></div>
-                  <div>Monthly run rate: <b>{typeof m.monthlyRunRate === 'number' ? `$${m.monthlyRunRate.toLocaleString()}` : '—'}</b></div>
-                  <div>Commitment value vs on-demand: <b>{typeof m.commitmentValue === 'number' ? `$${m.commitmentValue.toLocaleString()}` : '—'}</b></div>
-                  <div>Break-even utilization: <b>{typeof m.breakEvenUtilization === 'number' ? `${(m.breakEvenUtilization * 100).toFixed(0)}%` : '—'}</b></div>
-                </div>
-                <Link
-                  to="/dealroom"
-                  className="mt-4 inline-block rounded-md bg-sky-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-sky-700"
-                >
-                  Request connection → Deal Room
-                </Link>
-                <p className="mt-2 text-[11px] text-slate-400">
-                  Opens the connection-approval state for the Falcon deal, then the Deal Room on approval (SPEC §16.4).
-                </p>
-              </div>
-            </div>
-          </td>
-        </tr>
-      )}
-    </>
+          </div>
+          <div className="mt-0.5 text-xs text-text-4">{rank}</div>
+        </div>
+      </div>
+
+      <dl className="mt-4 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
+        <MatchStat label="Committed" value={committed} sub="/accel-hr" />
+        <MatchStat label="Effective" value={effective} sub="/hr" />
+        <MatchStat label="Performance" value={comp.performance ?? '—'} />
+        <MatchStat label="Sovereignty" value={comp.sovereignty ?? '—'} />
+        <MatchStat label="Power / Resilience" value={comp.powerResilience ?? '—'} />
+      </dl>
+
+      <p className="mt-3 text-xs text-text-3">{m.explanation || '—'}</p>
+
+      <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-white/10 pt-3">
+        <span className="text-xs text-text-4">TCV {tcv}</span>
+        <Link to="/dealroom" className="sg-btn sg-btn--primary text-xs">
+          Request connection → Deal Room
+        </Link>
+      </div>
+    </article>
+  )
+}
+
+function MatchStat({ label, value, sub }) {
+  return (
+    <div className="min-w-0">
+      <dt className="sg-stat__label">{label}</dt>
+      <dd className="sg-stat__value break-words">
+        <span className="sg-num">{value}</span>
+        {sub && <span className="text-text-4"> {sub}</span>}
+      </dd>
+    </div>
   )
 }
 
 function HeldCard({ m }) {
   return (
-    <div className="rounded-lg border border-rose-200 bg-rose-50 p-4">
+    <div className="sg-card sg-card--danger p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h3 className="font-semibold text-rose-900">{m.name}</h3>
-          <p className="text-xs text-rose-700">
-            {/* eslint-disable-next-line react/no-unescaped-entities */}
-            Match score <b>{m.matchScore}</b> · {m.listingId}
+          <h3 className="font-semibold text-text-1">{m.name}</h3>
+          <p className="text-xs text-text-3">
+            Match score <b className="text-text-1">{m.matchScore}</b> · {m.listingId}
           </p>
         </div>
-        <span className="rounded bg-rose-600 px-2.5 py-1 text-xs font-bold text-white">DISQUALIFIED — policy condition</span>
+        <span className="sg-pill sg-pill--danger">DISQUALIFIED — policy condition</span>
       </div>
-      <p className="mt-2 text-sm text-rose-900">{m.disqualifyReason}</p>
-      <p className="mt-1 text-xs text-rose-700">
+      <p className="mt-2 text-sm text-text-2">{m.disqualifyReason}</p>
+      <p className="mt-1 text-xs text-text-3">
         Route-specific, evidence-driven decision — not a blanket geography exclusion. Listed as eligible supply in the
         market; this transaction requires additional evidence before it is bookable.
       </p>

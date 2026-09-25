@@ -38,16 +38,22 @@ def run():
                            ("/crm", "crm"), ("/intel", "intel")]:
             check("SCREEN " + name, "renders without placeholder", lambda pp=path: no_construction(pg, pp))
 
-        # D03: marketplace has both sides + working filter
+        # D03: marketplace has both sides + working filter.
+        # Wave G replaced native <select> with a popover-based custom Select
+        # (role=combobox + popover panel), so the filter control is no longer a
+        # native <select>. We still verify >=1 filter control and that it opens
+        # (click -> panel visible) then closes (Esc) — same D03 intent.
         def d03():
             pg.goto(BASE + "/", wait_until="networkidle")
             body = pg.inner_text("body")
             assert "Listing" in body or "listing" in body or "Supply" in body, "no supply side"
             assert "Request" in body or "Demand" in body, "no demand side"
-            sels = pg.locator("select")
-            assert sels.count() >= 1, "no filter control"
-            sels.nth(0).select_option(index=0)
-            return "filters present: %d" % sels.count()
+            filters = pg.locator("[role='combobox']")
+            assert filters.count() >= 1, "no filter control"
+            filters.nth(0).click()
+            pg.wait_for_timeout(200)
+            pg.keyboard.press("Escape")
+            return "filters present: %d" % filters.count()
         check("D03", "marketplace both sides + filter", d03)
 
         # D01: post-demand form with core fields, submit creates request

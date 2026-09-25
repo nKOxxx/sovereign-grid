@@ -1,0 +1,63 @@
+/* src/components/Select.css — popover-based custom select (Wave G)
+   Panel styling (.sg-select / .sg-select__item / aria-selected) lives in
+   design/tokens.css. Here we add the trigger, the root row, and a
+   state-driven visibility fallback so the dropdown behaves identically in
+   real browsers (native Popover API + top layer) and in SSX/tests (happy-dom)
+   where the popover API is unavailable. */
+
+.sg-select__root {
+  align-items: center;
+  display: inline-flex;
+  gap: 6px;
+}
+
+.sg-select__label {
+  color: var(--sg-text-3);
+  font-size: 12px;
+  font-weight: 510;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.sg-select__trigger {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--sg-border);
+  border-radius: 6px;
+  color: var(--sg-text-1);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 510;
+  gap: 8px;
+  line-height: 1;
+  padding: 7px 10px;
+  transition: border-color var(--sg-dur-fast) var(--sg-ease),
+              background var(--sg-dur-fast) var(--sg-ease);
+}
+.sg-select__trigger:hover { background: rgba(255, 255, 255, 0.05); border-color: var(--sg-border-strong); }
+.sg-select__trigger:focus-visible { outline: 2px solid rgba(62, 139, 255, 0.5); outline-offset: 2px; }
+
+.sg-select__value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sg-select__caret { color: var(--sg-text-3); flex: 0 0 auto; transition: transform var(--sg-dur-fast) var(--sg-ease); }
+.sg-select--open .sg-select__caret { transform: rotate(180deg); }
+
+/* The popover panel. Hidden by default. .sg-select--open drives display so
+   behaviour is testable everywhere; in real browsers showPopover() additionally
+   engages the native top layer. */
+.sg-select { display: none; }
+.sg-select--open { display: block; animation: sg-pop 150ms cubic-bezier(0.16, 1, 0.3, 1); }
+@keyframes sg-pop { from { opacity: 0; transform: translateY(4px); } }
+
+.sg-select__item {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.sg-select__check { color: var(--sg-accent); }
+.sg-select__item--selected { background: var(--sg-accent-dim); color: var(--sg-accent); }
+
+@media (prefers-reduced-motion: reduce) {
+  .sg-select--open { animation: none; }
+}

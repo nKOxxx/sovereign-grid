@@ -1,4 +1,10 @@
 // src/screens/MarketplaceHome.jsx
+// Wave G visual redesign: dark canvas, Aurora hero behind a .sg-display
+// headline, KPI strip (derived aggregates), custom popover-based Select filter
+// row, and supply listings as .sg-card tiles with tabular prices + status
+// pills. Offline fallback (seed + 'API offline' badge) is preserved, as are all
+// data-testid / aria-label hooks used by e2e/verify_demo.py and
+// e2e/sweep_buttons.py.
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMarket } from '../store/MarketContext.jsx'
@@ -6,7 +12,10 @@ import { acceleratorProfiles } from '../data/seed.js'
 import { api } from '../lib/api.js'
 import { getToken } from '../lib/auth.js'
 import { marketplaceRowToListing, requestRowToCard } from '../lib/apiMappers.js'
-import { DemoBadge, OfflineBadge, VerifiedPill } from './ui.jsx'
+import { DemoBadge, OfflineBadge } from './ui.jsx'
+import Select from '../components/Select.jsx'
+import Aurora from '../components/Aurora.jsx'
+import './wave-g.css'
 
 const VENDOR_OPTIONS = ['All vendors', 'NVIDIA', 'AMD', 'Huawei', 'Google']
 const REGION_OPTIONS = ['All regions', 'EU', 'UAE', 'US', 'China']
@@ -79,86 +88,104 @@ export default function MarketplaceHome() {
     [listings, vendor, region, firmness],
   )
 
+  // Aggregate KPIs derivable from the supply data (count, total accelerators,
+  // committed price floor/ceiling). Rendered only when data is present.
+  const kpi = useMemo(() => {
+    if (!listings.length) return null
+    const prices = listings
+      .map((l) => l.price && l.price.committedPerAccelHr)
+      .filter((n) => typeof n === 'number')
+    return {
+      listings: listings.length,
+      accelerators: listings.reduce((s, l) => s + (l.count || 0), 0),
+      minPrice: prices.length ? Math.min(...prices) : null,
+      maxPrice: prices.length ? Math.max(...prices) : null,
+    }
+  }, [listings])
+
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6">
-      <div className="mb-2 flex items-center gap-2">
-        <DemoBadge />
-        {offline && <OfflineBadge />}
-        <span className="text-xs text-slate-500">{demoNote}</span>
-      </div>
-      <h1 className="text-2xl font-bold text-slate-900">Marketplace</h1>
-      <p className="mt-1 max-w-3xl text-sm text-slate-600">
-        A broker-assisted, accelerator-neutral marketplace for verified compute. Browse supply, then compare
-        normalized offers. Sellers' claims appear as <b>Unverified</b> until reviewed evidence is attached.
-      </p>
-
-      <div className="mt-6 grid gap-6 lg:grid-cols-2">
-        {/* Supply */}
-        <section>
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-slate-800">Supply listings ({filtered.length})</h2>
-            <Link
-              to="/list-capacity"
-              className="rounded-md bg-sky-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-sky-700"
-            >
-              + List capacity
-            </Link>
+    <div className="sg-root sg-mkt min-h-screen bg-canvas">
+      <header className="sg-hero">
+        <Aurora className="sg-aurora" style={{ opacity: 0.34 }} speed={0.9} />
+        <div className="sg-hero__inner mx-auto max-w-6xl px-4 pt-10">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <DemoBadge />
+            {offline && <OfflineBadge />}
+            <span className="text-xs text-text-3">{demoNote}</span>
           </div>
-
-          <div className="mb-3 flex flex-wrap gap-2">
-            <FilterSelect value={vendor} onChange={setVendor} options={VENDOR_OPTIONS} label="Vendor" />
-            <FilterSelect value={region} onChange={setRegion} options={REGION_OPTIONS} label="Region" />
-            <FilterSelect value={firmness} onChange={setFirmness} options={FIRMNESS_OPTIONS} label="Firmness" />
+          <h1 className="sg-display max-w-2xl text-4xl sm:text-5xl">Marketplace</h1>
+          <p className="mt-3 max-w-3xl text-sm text-text-2">
+            A broker-assisted, accelerator-neutral marketplace for verified compute. Browse supply, then compare
+            normalized offers. Sellers' claims appear as <b className="text-text-1">Unverified</b> until reviewed
+            evidence is attached.
+          </p>
+        </div>
+        {kpi && (
+          <div className="sg-kpi-row mx-auto max-w-6xl px-4 pt-8">
+            <Kpi label="Supply listings" value={kpi.listings} />
+            <Kpi label="Total accelerators" value={kpi.accelerators.toLocaleString()} />
+            <Kpi label="Committed price floor" value={kpi.minPrice != null ? `$${kpi.minPrice.toFixed(2)}` : '—'} suffix="/accel-hr" />
+            <Kpi label="Committed price ceiling" value={kpi.maxPrice != null ? `$${kpi.maxPrice.toFixed(2)}` : '—'} suffix="/accel-hr" />
           </div>
+        )}
+      </header>
 
-          <div className="space-y-3">
+      <main className="mx-auto max-w-6xl px-4 pb-10 pt-8">
+        <div className="grid gap-8 lg:grid-cols-2">
+          {/* Supply */}
+          <section>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-text-1">Supply listings ({filtered.length})</h2>
+              <Link to="/list-capacity" className="sg-btn sg-btn--primary text-sm">
+                + List capacity
+              </Link>
+            </div>
+            <div className="mb-4 flex flex-wrap gap-x-4 gap-y-2">
+              <Select value={vendor} onChange={setVendor} options={VENDOR_OPTIONS} label="Vendor" />
+              <Select value={region} onChange={setRegion} options={REGION_OPTIONS} label="Region" />
+              <Select value={firmness} onChange={setFirmness} options={FIRMNESS_OPTIONS} label="Firmness" />
+            </div>
             {filtered.length === 0 && (
-              <p className="rounded-md border border-dashed border-slate-300 p-4 text-sm text-slate-500">
+              <p className="sg-empty rounded-md p-4 text-sm text-text-3">
                 No listings match the current filters.
               </p>
             )}
-            {filtered.map((l) => (
-              <ListingCard key={l.id} listing={l} />
-            ))}
-          </div>
-        </section>
+            <div className="sg-listing-grid">
+              {filtered.map((l) => (
+                <ListingCard key={l.id} listing={l} />
+              ))}
+            </div>
+          </section>
 
-        {/* Demand */}
-        <section>
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-slate-800">Open buyer requests ({requests.length})</h2>
-            <Link
-              to="/post-demand"
-              className="rounded-md bg-sky-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-sky-700"
-            >
-              + Post demand
-            </Link>
-          </div>
-          <div className="space-y-3">
-            {requests.map((r) => (
-              <RequestCard key={r.id} request={r} />
-            ))}
-          </div>
-        </section>
-      </div>
+          {/* Demand */}
+          <section>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-text-1">Open buyer requests ({requests.length})</h2>
+              <Link to="/post-demand" className="sg-btn sg-btn--primary text-sm">
+                + Post demand
+              </Link>
+            </div>
+            <div className="space-y-3">
+              {requests.map((r) => (
+                <RequestCard key={r.id} request={r} />
+              ))}
+            </div>
+          </section>
+        </div>
+      </main>
     </div>
   )
 }
 
-function FilterSelect({ value, onChange, options, label }) {
+function Kpi({ label, value, suffix }) {
   return (
-    <label className="flex items-center gap-1 text-xs text-slate-600">
-      <span>{label}:</span>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="rounded-md border border-slate-300 bg-white px-2 py-1 text-sm"
-      >
-        {options.map((o) => (
-          <option key={o}>{o}</option>
-        ))}
-      </select>
-    </label>
+    <div className="sg-card sg-kpi">
+      <div className="sg-kpi__label">{label}</div>
+      <div className="sg-kpi__value sg-num">
+        {value}
+        {suffix && <span className="ml-1 text-sm font-normal text-text-3">{suffix}</span>}
+      </div>
+    </div>
   )
 }
 
@@ -167,54 +194,57 @@ function ListingCard({ listing }) {
   const acc = acceleratorProfiles[l.accelerator.profile]
   const anonymous = l.seller && l.seller.anonymous
   const price = l.price ? l.price.committedPerAccelHr : null
+  const hasEvidence = Array.isArray(l.evidence) && l.evidence.length > 0
+  const unverified = !hasEvidence || /^unverified$/i.test(l.verificationStatus || '')
+
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h3 className="font-semibold text-slate-900">
-            {l.name}
-            {anonymous && <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-500">Anonymous</span>}
-            {!acc.vendor.includes('NVIDIA') && (
-              <span className="ml-2 rounded bg-indigo-100 px-1.5 py-0.5 text-[11px] text-indigo-700">non-NVIDIA</span>
-            )}
-          </h3>
-          <p className="text-xs text-slate-500">
+    <article className="sg-card sg-card--hover flex flex-col p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="sg-display text-base">{l.name}</h3>
+          <p className="mt-0.5 text-xs text-text-3">
             {anonymous ? 'Seller identity hidden until connection approval' : l.seller.identity} ·{' '}
             {l.facility.country}
           </p>
         </div>
-        <VerifiedPill listing={l} />
+        <span className={`sg-pill shrink-0 ${unverified ? '' : 'sg-pill--success'}`}>
+          {unverified ? 'Unverified' : l.verificationStatus}
+        </span>
       </div>
-      <div className="mt-3 grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
-        <Stat label="Accelerator" value={`${acc.model}`} />
-        <Stat label="Count" value={`${l.count}`} />
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {anonymous && <span className="sg-pill">Anonymous</span>}
+        {!acc.vendor.includes('NVIDIA') && <span className="sg-pill sg-pill--accent">non-NVIDIA</span>}
+      </div>
+      <dl className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+        <Stat label="Accelerator" value={acc.model} />
+        <Stat label="Count" value={String(l.count)} />
         <Stat label="Firmness" value={l.firmness} />
         <Stat label="Start" value={l.startDate} />
-      </div>
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
-        <span className="text-sm text-slate-600">
+      </dl>
+      <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-white/10 pt-3">
+        <span className="text-sm">
           {price !== null ? (
             <>
-              <span className="text-base font-semibold text-slate-900">${price.toFixed(2)}</span>
-              <span className="text-xs text-slate-500">/accel-hr committed</span>
+              <span className="sg-num text-lg text-text-1">${price.toFixed(2)}</span>
+              <span className="text-xs text-text-3">/accel-hr committed</span>
             </>
           ) : (
             'price on request'
           )}
         </span>
-        <span className="text-xs text-slate-400">
-          {l.evidence.length} evidence item{l.evidence.length === 1 ? '' : 's'} on file
+        <span className="text-xs text-text-4">
+          {l.evidence.length} evidence item{l.evidence.length === 1 ? '' : 's'}
         </span>
       </div>
-    </div>
+    </article>
   )
 }
 
 function Stat({ label, value }) {
   return (
-    <div>
-      <div className="text-[11px] uppercase tracking-wide text-slate-400">{label}</div>
-      <div className="truncate text-sm text-slate-800">{value}</div>
+    <div className="min-w-0">
+      <dt className="sg-stat__label">{label}</dt>
+      <dd className="sg-stat__value break-words">{value}</dd>
     </div>
   )
 }
@@ -223,34 +253,31 @@ function RequestCard({ request }) {
   const isGolden = request.golden
   const acc = acceleratorProfiles[request.accelerator.preferred]
   return (
-    <div
-      className={`rounded-lg border p-4 shadow-sm ${isGolden ? 'border-amber-300 bg-amber-50' : 'border-slate-200 bg-white'}`}
-    >
+    <div className={`sg-card p-4 ${isGolden ? 'sg-card--golden' : ''}`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="font-semibold text-slate-900">
+        <h3 className="sg-display text-base">
           {request.name}
-          {isGolden && (
-            <span className="ml-2 rounded bg-amber-200 px-1.5 py-0.5 text-[11px] font-semibold text-amber-900">
-              Golden scenario
-            </span>
-          )}
+          {isGolden && <span className="sg-pill sg-pill--accent ml-2">Golden scenario</span>}
         </h3>
         <DemoBadge />
       </div>
-      <p className="text-xs text-slate-500">{request.company}</p>
-      <div className="mt-3 grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">
+      <p className="mt-0.5 text-xs text-text-3">{request.company}</p>
+      <dl className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
         <Stat label="Preferred" value={acc ? acc.model : request.accelerator.preferred} />
-        <Stat label="Count" value={`${request.count}`} />
+        <Stat label="Count" value={String(request.count)} />
         <Stat label="Term" value={`${request.termMonths} mo`} />
         <Stat label="Start" value={request.startDate} />
-        <Stat label="Locations" value={`${request.location.primary.join('/')}${request.location.failover.length ? ' + ' + request.location.failover.join('/') : ''}`} />
+        <Stat
+          label="Locations"
+          value={`${request.location.primary.join('/')}${request.location.failover.length ? ' + ' + request.location.failover.join('/') : ''}`}
+        />
         <Stat label="Firmness" value={request.firmness} />
-      </div>
+      </dl>
       {isGolden && (
-        <div className="mt-3 border-t border-amber-200 pt-3">
-          <p className="text-sm text-amber-900">
+        <div className="mt-3 border-t border-white/10 pt-3">
+          <p className="text-sm text-text-2">
             {request.summary.headline} —{' '}
-            <Link to="/matches" className="font-semibold underline">
+            <Link to="/matches" className="font-semibold text-accent underline">
               View normalized matches
             </Link>
           </p>
