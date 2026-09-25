@@ -36,3 +36,9 @@ Scope per SPEC §22.2: interactive demo of Sections 16–17, Project Falcon scen
 ## Known scope lines
 - Single-deal demo: deal room always renders the Falcon × Nordic deal (spec-scoped).
 - Test files 6; no e2e framework in repo (hub drives Playwright externally).
+
+## Wave G2 — Fee Engine UI (2026-09-25)
+| wave | worker | transport | tests | e2e |
+|---|---|---|---|---|
+| sg-p1-waveG2-001 | DeepSeek V4-Flash (hyper-deepseek), attempts=1 | stdio (`scripts/dispatch-stdio.sh`) | 150/150 (+11) | 26/26 (local + D12 clean) |
+Deliverables: FeeVisualizations.jsx (fee-sensitivity curve 0–20% via real computeFees/computeCalculator, fee-flow waterfall, §22.1 partner split), fee-visualizations.css (SG dark), 11 vitest tests; FeeEngine.jsx wiring preserved (slider/RBAC/testids). Deployed: 526a331 → Render live.
