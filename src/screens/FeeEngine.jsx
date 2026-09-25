@@ -7,6 +7,15 @@ import { DemoBadge, Field, inputCls, OfflineBadge } from './ui.jsx'
 import { useRole } from '../lib/useRole.js'
 import { getToken } from '../lib/auth.js'
 import { fetchFeePolicy, saveFeePolicy, operatorLabel } from '../lib/operator.js'
+import {
+  buildSensitivitySeries,
+  buildFeeFlow,
+  buildPartnerSplit,
+  buildEffectiveRate,
+  FeeSensitivityChart,
+  FeeFlowBreakdown,
+  PartnerSplitView,
+} from './FeeVisualizations.jsx'
 
 const fmtHr = (n) => '$' + n.toFixed(3)
 const fmtUsd = (n) => '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 })
@@ -42,6 +51,22 @@ export default function FeeEngine() {
         minMarginPct,
       }),
     [sellerBase, passthrough, platformFee, feeBasis, perHrFee, feePayer, splitPct, taxRate, partnerSplitPct, minMarginPct],
+  )
+
+  // Wave G2 — visualizations derive every number from the live config through
+  // the real domain functions (computeFees / computeCalculator / partnerSplit).
+  const sensitivity = useMemo(
+    () => buildSensitivitySeries({ sellerBase, passthrough, feePayer, splitPct, taxRate: taxRate / 100 }),
+    [sellerBase, passthrough, feePayer, splitPct, taxRate],
+  )
+  const flow = useMemo(
+    () => buildFeeFlow({ sellerBase, passthrough, platformFee: feeBasis === 'pct' ? platformFee : perHrFee, feeBasis, feePayer, splitPct, taxRate: taxRate / 100 }),
+    [sellerBase, passthrough, platformFee, feeBasis, perHrFee, feePayer, splitPct, taxRate],
+  )
+  const split = useMemo(() => buildPartnerSplit({ platformGross: fee.platformGross, partnerSplitPct }), [fee.platformGross, partnerSplitPct])
+  const effectivePerAccelHr = useMemo(
+    () => buildEffectiveRate({ count: listing.count, pricePerAccelHr: listing.price.committedPerAccelHr, onDemandPerAccelHr: listing.price.onDemandPerAccelHr }),
+    [listing],
   )
 
   const showGuard = fee.needsApproval && !approved
@@ -173,6 +198,21 @@ export default function FeeEngine() {
           )}
         </section>
       </div>
+
+      {/* Wave G2 — Recharts visualization section (Sovereign Grid dark theme). */}
+      <section className="mt-6" aria-label="Fee engine visualization">
+        <div className="mb-3 flex items-center gap-2">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Visualization</h2>
+          <span className="rounded bg-sky-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-sky-700">live</span>
+          <span className="text-xs text-slate-400">derived from the current fee configuration above</span>
+        </div>
+        <div className="grid gap-4 lg:grid-cols-3">
+          <FeeSensitivityChart rows={sensitivity} />
+          <FeeFlowBreakdown flow={flow} effectivePerAccelHr={effectivePerAccelHr} />
+          <PartnerSplitView split={split} />
+        </div>
+      </section>
+
       <PolicyPanel />
       <p className="mt-4 text-xs text-slate-400">{DEMO_NOTE}</p>
     </div>

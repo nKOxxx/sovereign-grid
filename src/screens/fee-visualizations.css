@@ -1,0 +1,39 @@
+/* src/screens/fee-visualizations.css — Wave G2 Fee Engine chart presentation.
+   Reuses the Sovereign Grid design tokens (.sg-card, .sg-num, bg-* color
+   utilities registered in design/tokens.css). No new CSS framework. */
+
+.sg-fig__title {
+  color: var(--sg-text-1);
+  font-size: 14px;
+  font-weight: 590;
+  letter-spacing: -0.01em;
+}
+
+.sg-fig__sub {
+  color: var(--sg-text-3);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.sg-fig__big {
+  color: var(--sg-text-1);
+  font-size: 22px;
+  font-weight: 590;
+  letter-spacing: -0.02em;
+  margin-top: 4px;
+}
+
+/* Chart numbers always tabular (the financial-product tell). */
+.sg-fig__big,
+.sg-fig__sub {
+  font-feature-settings: "tnum";
+}
+
+/* Legend + tooltip labels inherit the light-on-dark ink. */
+.recharts-legend-item-text {
+  color: var(--sg-text-2) !important;
+  font-size: 11px;
+}
+.recharts-tooltip-label {
+  color: var(--sg-text-2);
+}
