@@ -6,3 +6,4 @@ runs.jsonl
 .env.*
 !.env.example
 server/node_modules
+backups/

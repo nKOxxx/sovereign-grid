@@ -106,6 +106,32 @@ Secret changes and `fly deploy` both trigger a new release automatically.
 - Free-tier note: Render free Postgres expires after 30 days on some accounts —
   add a card or upgrade before then to keep the DB.
 
+## Free-tier notes (Fly)
+
+- The app machine suspends when idle and **wakes on request** (40–90 s cold
+  start). Expect a rare transient 502 on the first hit after idle — not a bug.
+  Paid plan or a keepalive ping removes it.
+- Dead clusters `sovereign-grid-db` / `sovereign-grid-db2` (free managed
+  Postgres, unusable: auto-suspend) were destroyed on 2026-09-25.
+
+## DB expiry & rotation
+
+Render free Postgres expires 30 days after creation (API field `expiresAt`;
+current DB: 2026-10-25T07:00Z). Two options:
+
+1. **Dashboard upgrade** (needs a card on the Render account): cheapest tier
+   removes expiry. Plan changes are NOT accepted via API (PATCH → 500).
+2. **Rotation** (automated, free): `scripts/rotate_render_db.sh rotate` —
+   dumps the live DB, creates a fresh free DB (new 30-day window), provisions
+   roles, restores, swaps the Fly secret, verifies health. `check` subcommand
+   exits nonzero when ≤7 days remain (cron-watchdog friendly). Caveat: the
+   Render API only returns new-DB credentials in the **create response** (reads
+   show `connectionInfo: null`) — if a future API change drops them, the script
+   fails safely with the old DB still serving.
+
+Pre-rotation dumps live in `backups/` (gitignored). Baseline:
+`backups/sg_prod_20260925.dump` (14 tables, verified).
+
 ## e2e
 
 Local full suite: `~/venvs/fcc/bin/python e2e/verify_demo.py` (26 checks) with
