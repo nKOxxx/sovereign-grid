@@ -40,7 +40,7 @@ export function createFeesRouter({ pool }) {
       // query hides the stored row and returns the default even after a PUT.
       const { rows } = await withUser(req.user.id, req.user.role, async (c) => {
         return c.query('SELECT value FROM fee_policy WHERE key = $1', [POLICY_KEY])
-      })
+      }, pool)
       const stored = rows.length ? rows[0].value : {}
       res.status(200).json({ policy: resolveFeePolicy(stored) })
     } catch (err) {
