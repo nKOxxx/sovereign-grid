@@ -49,3 +49,10 @@ Deliverables: FeeVisualizations.jsx (fee-sensitivity curve 0–20% via real comp
 | Demo-cleanup route | DELETE /api/requests/:id (operator-only, offers purged, deal-tied → 409); server 106/106; golden_live.py probe: 6/6 live vs prod (self-cleaned), local + Render |
 | Clean URL | Render subdomain immutable; successor service blocked by Render API 500s on POST /v1/services (their outage); retry later or custom domain |
 Deployed: 4ddd831 + docs → Render live.
+
+## Design pass (2026-09-25 night) — b354e19
+Fixes the G2 miss: Fee Engine shipped on default light styling inside the dark app.
+- Root causes: design/tokens.css v1 existed but FeeEngine predated it; index.html loaded no webfonts (system-font fallback app-wide); 4 native selects; default Recharts gridlines.
+- Applied: full token reskin (canvas/surface/text ladders, single azure accent), custom Select on all 4 (added disabled prop), sg-num on every figure, gridlines rgba(255,255,255,.06), Inter+JetBrains Mono self-hosted (Fontsource, CSP-clean).
+- Gates: 153/153 vitest (3 new design-guard tests: zero native selects, zero light-theme classes, sg-num/sg-card/sg-display present), 26/26 e2e, fonts.check true, body bg #0a0a0b, 0 console errors.
+- Rule going forward: world-class-frontend skill loads on ANY Sovereign Grid UI change; new screens render through .sg-* tokens only.
