@@ -14,6 +14,6 @@ COPY server/package.json server/package-lock.json ./
 RUN npm ci --omit=dev
 COPY --from=build /app/dist /app/dist
 COPY server/ ./
-ENV PORT=8080 NODE_ENV=production
+ENV PORT=8080 NODE_ENV=production SG_BOOT_MIGRATE=1 SG_STATIC_DIR=/app/dist
 EXPOSE 8080
 CMD ["node", "src/boot.js"]

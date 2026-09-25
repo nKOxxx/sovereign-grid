@@ -1,0 +1,12 @@
+node_modules
+**/node_modules
+.git
+.gitignore
+dist
+*.log
+runs.jsonl
+.env
+**/.env
+.env.*
+/tmp
+DESIGN_*.md
