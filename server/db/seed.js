@@ -240,10 +240,12 @@ export async function seed(pool = createPool()) {
         [id, role, email, dn, role === 'operator' ? null : ph], // operator dev login set separately below
       )
     }
-    // NOTE: operator gets a known dev password (documented at top) — provision it
-    // explicitly so re-running the seed never wipes a hash an admin may have set.
+    // NOTE: operator gets a known dev password (documented at top) — provision
+    // it ONLY when the account has no password yet. Unconditional UPDATEs here
+    // would silently restore the public dev password on every boot and wipe
+    // any hash an admin rotated in production.
     await c.query(
-      `UPDATE users SET password_hash = $2 WHERE id = $1`,
+      `UPDATE users SET password_hash = $2 WHERE id = $1 AND password_hash IS NULL`,
       [U.operator, opHash],
     )
 
