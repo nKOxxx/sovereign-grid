@@ -20,8 +20,9 @@
 import '../src/env.js'
 import { validateEnv } from './env.js'
 import { migrate } from './db/migrate.js'
-import { createPool } from './db/pool.js'
+import { createPool, defaultPool } from './db/pool.js'
 import { seed } from '../db/seed.js'
+import { startDbKeepalive } from './db/keepalive.js'
 import { createApp } from './app.js'
 
 const missing = validateEnv()
@@ -53,6 +54,9 @@ if (process.env.SG_BOOT_MIGRATE === '1') {
   await migrateAndSeedWithRetry()
   console.log('[boot] schema + seed ready')
 }
+
+// Never let the platform consider the database idle (see db/keepalive.js).
+startDbKeepalive(defaultPool)
 
 const PORT = process.env.PORT
 const app = createApp()
