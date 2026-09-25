@@ -14,8 +14,14 @@ const { Client } = pg
 const ADMIN_URL = process.env.SG_TEST_ADMIN_URL || 'postgresql:///postgres?host=/tmp'
 // Socket dir locally (/tmp); CI overrides with SG_TEST_PG_HOST=localhost for TCP.
 const HOST = process.env.SG_TEST_PG_HOST || '/tmp'
+// Admin role for scratch-DB URLs: OS user locally (ares via socket trust);
+// CI sets SG_TEST_PG_USER=postgres.
+const ADMIN_USER = process.env.SG_TEST_PG_USER
 
-export const baseUrl = (db) => `postgresql:///${db}?host=${HOST}`
+export const baseUrl = (db) =>
+  ADMIN_USER
+    ? `postgresql://${ADMIN_USER}@/${db}?host=${HOST}`
+    : `postgresql:///${db}?host=${HOST}`
 export const appUrl = (db) => `postgresql://sg_app@/${db}?host=${HOST}`
 export const migrateUrl = (db) => `postgresql://sg_migrate@/${db}?host=${HOST}`
 
