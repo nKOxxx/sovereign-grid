@@ -89,3 +89,9 @@ Fixes the G2 miss: Fee Engine shipped on default light styling inside the dark a
 - Native selects eliminated everywhere (Intel). Operator dev creds removed from Login card (buyer-only + "operator invite-only" note). Placeholder.jsx deleted. design-law.test.jsx: app-wide CI guard (0 light classes, 0 native selects across src).
 - Floors: 177/177 root (+4), 130/130 server, build ✓. Deployed df28ca2 live; golden 6/6 + e2e 26/26; prod dark sweep: 5 routes bg rgb(10,10,11), 0 white elements, 0 selects, 0 console errors.
 - STATE: build-complete. Marketplace loop closed, one coherent design, partner-ready.
+
+## Wave L — market-intel signals pipeline (2026-09-26, worker sg-p1-waveL-001, 1 attempt)
+- market_observations (0007): RLS + public SD read market_observations_public(), operator entry route, vast.ai ingest route (allowlist, $/accel-hr normalization, upsert by offer id, xmax detection). MarketIntel.jsx live-with-seed-fallback.
+- First real signals in prod: 5 vast.ai rows (H100/A100/H200, EU+US). Fix-up commit 01a844b: family taxonomy extended (0008 migration + backfill — 'H100 SXM' now 'H100'); prod re-verified families {H100:8, A100:1, H200:1}. Spot churn is real (cheap offers rotate hourly; dedupe verified correct — stable ids update, expired vanish, new insert).
+- Floors: 185/185 root, 143/143 server, build ✓; golden 6/6 + e2e 26/26 vs prod.
+- Ops: cron sg-vast-ingest every 6h (job e3d3ce8941ca). Sources runbook: docs/SOURCES.md. Next verified-but-uningested: Azure Retail Prices, AWS bulk index.
