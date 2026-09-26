@@ -177,6 +177,35 @@ export async function advanceDealStatus(id, status, { token } = {}) {
 }
 
 // ---------------------------------------------------------------------------
+// Listing review queue (§ listing gate) — operator approves/rejects
+// ---------------------------------------------------------------------------
+
+export const LISTING_PENDING = 'pending'
+
+/** GET /api/listings?status=pending -> the operator review queue (never throws). */
+export async function fetchPendingListings({ token } = {}) {
+  try {
+    const data = await apiGet('/listings?status=pending', token)
+    return { ok: true, data }
+  } catch (err) {
+    return { ok: false, data: null, error: err.message || 'Could not load review queue', code: err.code, offline: isOffline(err) }
+  }
+}
+
+/**
+ * PATCH /api/listings/:id/status -> { status: 'active' | 'rejected' }.
+ * Operator-only on the server; returns { ok, data, error, code, offline }.
+ */
+export async function setListingStatus(id, status, { token } = {}) {
+  try {
+    const data = await apiPatch(`/listings/${id}/status`, { status }, token)
+    return { ok: true, data }
+  } catch (err) {
+    return { ok: false, error: err.message || 'Could not update listing status', code: err.code, offline: isOffline(err) }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // small fetch helpers bound to the api client
 // ---------------------------------------------------------------------------
 import { api } from './api.js'

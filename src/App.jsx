@@ -5,6 +5,7 @@ import MarketplaceHome from './screens/MarketplaceHome.jsx'
 import PostDemand from './screens/PostDemand.jsx'
 import ListCapacity from './screens/ListCapacity.jsx'
 import SellerOnboarding from './screens/SellerOnboarding.jsx'
+import ListingReview from './screens/ListingReview.jsx'
 import MatchResults from './screens/MatchResults.jsx'
 import Calculator from './screens/Calculator.jsx'
 import FeeEngine from './screens/FeeEngine.jsx'
@@ -44,7 +45,12 @@ export default function App() {
               <NavLink to='/sell' className={navCls}>
                 Sell compute
               </NavLink>
-            )}
+              )}
+              {user && user.role === 'operator' && (
+                <NavLink to='/review' className={navCls}>
+                  Review
+                </NavLink>
+              )}
             <NavLink to='/matches' className={navCls}>
               Match Results
             </NavLink>
@@ -93,6 +99,7 @@ export default function App() {
             <Route path='/post-demand' element={<PostDemand />} />
             <Route path='/list-capacity' element={<ListCapacity />} />
             <Route path='/sell' element={<SellerOnboarding />} />
+            <Route path='/review' element={<ListingReview />} />
             <Route path='/matches' element={<MatchResults />} />
             <Route path='/calculator' element={<Calculator />} />
             <Route path='/fees' element={<FeeEngine />} />

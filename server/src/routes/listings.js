@@ -1,8 +1,13 @@
 // server/src/routes/listings.js
 // /api/listings — seller capacity listings + the public marketplace.
 //
-//   POST /api/listings                seller only  — create (seller_id = self)
+//   POST /api/listings                seller only  — create (seller_id = self;
+//                                     ALWAYS status='pending' — any client-
+//                                     supplied status is stripped; an operator
+//                                     must approve before it reaches the pool)
 //   GET  /api/listings                seller own / operator all
+//   GET  /api/listings?status=pending OPERATOR ONLY — review queue (seller/buyer 403)
+//   PATCH /api/listings/:id/status    operator only — approve('active') / reject('rejected')
 //   GET  /api/listings/marketplace    PUBLIC — anonymized marketplace read model
 //
 // Marketplace safety: served for anonymous clients via the security-definer
@@ -45,8 +50,16 @@ const listingSchema = z.object({
   power: z.unknown().optional(),
   verification_status: z.string().trim().max(50).optional(),
   evidence_confidence: z.coerce.number().int().min(0).max(100).optional(),
-  status: z.string().trim().max(50).default('active'),
 })
+
+// Listing status is NOT client-controllable on POST: zod strips any supplied
+// status and the route hardcodes 'pending' so an unreviewed listing can never
+// self-activate. Approve/reject is operator-only via PATCH /:id/status.
+const listingStatusSchema = z.object({
+  status: z.enum(['active', 'rejected']),
+})
+
+const paramsId = z.object({ id: z.string().uuid('invalid listing id') })
 
 /**
  * @param {{pool: import('pg').Pool}} opts
@@ -91,7 +104,7 @@ export function createListingsRouter({ pool }) {
         body.commercial ?? null, body.commitment ?? null, body.resilience ?? null,
         body.sovereign ?? null, body.power ?? null,
         body.verification_status ?? null, body.evidence_confidence ?? null,
-        body.status,
+        'pending', // review gate: new listings never self-activate
       ]
       const { rows } = await withUser(req.user.id, 'seller', async (c) => {
         const placeholders = columns.map((_, i) => `$${i + 1}`).join(', ')
@@ -109,10 +122,52 @@ export function createListingsRouter({ pool }) {
 
   router.get('/', requireRole(['seller', 'operator']), async (req, res, next) => {
     try {
+      // The pending review queue is operator-only. requireRole above already
+      // 403s buyers; we additionally 403 a seller who probes ?status=pending.
+      // Only one queue filter exists today — 'pending' — which the operator
+      // console renders. Values are compared against a fixed literal (never
+      // interpolated), so no SQL injection surface.
+      const isPendingQueue = req.query.status === 'pending'
+      if (isPendingQueue && req.user.role !== 'operator') {
+        res.status(403).json({ error: { code: 'forbidden', message: 'Insufficient role' } })
+        return
+      }
       const { rows } = await withUser(req.user.id, req.user.role, async (c) => {
+        if (isPendingQueue) {
+          return c.query(
+            'SELECT * FROM listings WHERE status = $1 ORDER BY created_at DESC',
+            ['pending'],
+          )
+        }
+        // Plain GET: RLS scopes a seller to their own rows (incl. their
+        // pending listings — their own data); operator sees all. The PUBLIC
+        // surface is /api/listings/marketplace, which is active-only via the
+        // v_marketplace_listings view, and the matching pool is active-only via
+        // match_listings_for_match() — neither leaks pending rows.
         return c.query('SELECT * FROM listings ORDER BY created_at DESC')
       }, pool)
       res.status(200).json({ listings: rows })
+    } catch (err) {
+      next(err)
+    }
+  })
+
+  // ---- review gate: operator approve / reject ------------------------------
+  router.patch('/:id/status', requireRole('operator'), async (req, res, next) => {
+    try {
+      const { id } = paramsId.parse(req.params)
+      const { status } = listingStatusSchema.parse(req.body)
+      const { rows } = await withUser(req.user.id, 'operator', async (c) => {
+        return c.query(
+          'UPDATE listings SET status = $1 WHERE id = $2 RETURNING *',
+          [status, id],
+        )
+      }, pool)
+      if (!rows.length) {
+        res.status(404).json({ error: { code: 'not_found', message: 'Not found' } })
+        return
+      }
+      res.status(200).json({ listing: rows[0] })
     } catch (err) {
       next(err)
     }

@@ -319,6 +319,19 @@ describe('listings + public marketplace', () => {
   })
 
   it('marketplace returns ONLY safe/anonymized fields (no seller_id, no committed_price)', async () => {
+    // The review gate means a new listing is 'pending' until an operator
+    // approves it, so approve the MI300X rack created above before asserting
+    // the public marketplace exposes it.
+    const { token: opTok } = await createSession(ids.op, 'operator', appPool)
+    const queue = await api('GET', '/api/listings?status=pending', { token: opTok })
+    const rack = queue.json.listings.find((l) => l.name === 'MI300X rack')
+    expect(rack).toBeTruthy()
+    const approved = await api('PATCH', `/api/listings/${rack.id}/status`, {
+      token: opTok,
+      body: { status: 'active' },
+    })
+    expect(approved.status).toBe(200)
+
     const r = await api('GET', '/api/listings/marketplace')
     expect(r.status).toBe(200)
     expect(r.json.listings.length).toBeGreaterThanOrEqual(1)
