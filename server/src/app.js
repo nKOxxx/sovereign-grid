@@ -30,6 +30,7 @@ import { createMarketplaceRouter } from './routes/marketplace.js'
 import { createCalculatorRouter } from './routes/calculator.js'
 import { createFeesRouter } from './routes/fees.js'
 import { createEligibilityRouter } from './routes/eligibility.js'
+import { createIntelRouter } from './routes/intel.js'
 
 const DEFAULT_CORS_ORIGINS = [
   'http://localhost:4173',
@@ -49,7 +50,7 @@ function parseCorsOrigins(env = process.env) {
 /**
  * @param {{pool?: import('pg').Pool, logger?: object}} [opts]
  */
-export function createApp({ pool = defaultPool, logger = console } = {}) {
+export function createApp({ pool = defaultPool, logger = console, fetchImpl = globalThis.fetch } = {}) {
   const app = express()
   app.disable('x-powered-by')
   app.set('trust proxy', true) // honour X-Forwarded-For so req.ip reflects the client
@@ -79,6 +80,9 @@ export function createApp({ pool = defaultPool, logger = console } = {}) {
   app.use('/api/calculator', createCalculatorRouter({ pool }))
   app.use('/api/fees', createFeesRouter({ pool }))
   app.use('/api/eligibility', createEligibilityRouter({ pool }))
+
+  // Wave L — market-intel observations backend (public read + operator ingest).
+  app.use('/api/intel', createIntelRouter({ pool, fetchImpl }))
 
   // Single-process deploy: when SG_STATIC_DIR points at the built frontend
   // (repo `dist/`), the API also serves it — same-origin /api, no CORS puzzle.

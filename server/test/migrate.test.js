@@ -38,6 +38,7 @@ describe('migrate', () => {
       expect(rows.map((r) => r.filename)).toEqual([
         '0001_init.sql', '0002_auth.sql', '0003_wave_c.sql',
         '0004_wave_c_fix.sql', '0005_listing_review.sql', '0006_deal_accept.sql',
+        '0007_market_observations.sql',
       ])
     } finally {
       await c.end()
@@ -76,8 +77,8 @@ describe('migrate', () => {
       )
       expect(rows.map((r) => r.relname)).toEqual([
         'approvals', 'audit_log', 'deal_parties', 'deals', 'eligibility_cases',
-        'evidence_items', 'fee_policy', 'listings', 'messages', 'offers',
-        'requests', 'sessions', 'users',
+        'evidence_items', 'fee_policy', 'listings', 'market_observations',
+        'messages', 'offers', 'requests', 'sessions', 'users',
       ])
     } finally {
       await c.end()

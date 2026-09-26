@@ -1,7 +1,16 @@
 // src/screens/MarketIntel.jsx — Market Intelligence (D11+D14, SPEC §14, §16.3 screen 11)
-import { useMemo, useState } from 'react'
+//
+// Wave L: the screen now reads REAL observations from the backend on mount
+// (GET /api/intel/observations — the SECURITY DEFINER whitelist read model).
+// If the fetch returns rows it renders them as live data (badge "Live —
+// vast.ai + curated"); if it fails or returns empty it falls back to the
+// static seed set and keeps the illustrative DemoBadge. House law is
+// preserved either way: figures are dated, evidence-specific observations
+// feeding an indicative index — never a live market price.
+import { useEffect, useMemo, useState } from 'react'
 import { marketObservations } from '../data/seed.js'
-import { groupMarket, acceleratorFamily, MARKET_LEVELS } from '../lib/deal.js'
+import { groupMarket, MARKET_LEVELS } from '../lib/deal.js'
+import { seedToObservation, fetchObservations } from '../lib/marketIntel.js'
 import { DemoBadge } from './ui.jsx'
 import Select from '../components/Select.jsx'
 
@@ -13,16 +22,24 @@ const LEVEL_META = {
 
 export default function MarketIntel() {
   const [levelFilter, setLevelFilter] = useState('All')
+  const [liveRows, setLiveRows] = useState(null) // null -> seed fallback
 
-  const obs = useMemo(
-    () =>
-      marketObservations.map((o) => ({
-        ...o,
-        level: o.level,
-        family: acceleratorFamily(o.accelerator),
-      })),
-    [],
-  )
+  useEffect(() => {
+    let cancelled = false
+    fetchObservations().then((rows) => {
+      if (!cancelled && rows) setLiveRows(rows)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const live = Boolean(liveRows && liveRows.length)
+
+  const obs = useMemo(() => {
+    if (liveRows && liveRows.length) return liveRows
+    return marketObservations.map(seedToObservation)
+  }, [liveRows])
 
   // Aggregate per level+family+region (levels never mixed — grouped by level first).
   const { cells, hidden } = useMemo(() => groupMarket(obs, { groups: (o) => `${o.level}|${o.family}|${o.region}` }), [obs])
@@ -32,8 +49,18 @@ export default function MarketIntel() {
   return (
     <div className="mx-auto max-w-6xl px-4 py-6">
       <div className="mb-2 flex flex-wrap items-center gap-2">
-        <DemoBadge />
-        <span className="text-xs text-text-3">Benchmark view — every figure DEMO / illustrative, never a live market price.</span>
+        {live ? (
+          <span className="rounded bg-[color:var(--sg-accent-dim)] px-2 py-0.5 text-[11px] font-semibold tracking-wide text-accent">
+            Live — vast.ai + curated
+          </span>
+        ) : (
+          <DemoBadge />
+        )}
+        <span className="text-xs text-text-3">
+          {live
+            ? 'Benchmark view — dated, evidence-specific observations feeding an indicative index.'
+            : 'Benchmark view — every figure DEMO / illustrative, never a live market price.'}
+        </span>
       </div>
       <h1 className="sg-display text-2xl">Market Intelligence</h1>
 
@@ -81,7 +108,7 @@ export default function MarketIntel() {
                   </td>
                   <td className="px-3 py-2 text-text-2">{o.region}</td>
                   <td className="px-3 py-2 text-text-2">{o.term}</td>
-                  <td className="sg-num px-3 py-2 font-semibold text-text-1">{o.pricePerAccelHr.toFixed(2)}</td>
+                  <td className="sg-num px-3 py-2 font-semibold text-text-1">{Number(o.pricePerAccelHr).toFixed(2)}</td>
                   <td className="px-3 py-2 text-text-2">{o.date}</td>
                   <td className="px-3 py-2 text-xs text-text-3">{o.source}</td>
                 </tr>
@@ -99,7 +126,11 @@ export default function MarketIntel() {
       {/* Forward scenario (indicative) */}
       <ForwardScenario />
 
-      <p className="mt-4 text-xs text-text-4">Demo — illustrative analytics. Published analytics are aggregated and reviewed for confidentiality (SPEC §15.2).</p>
+      <p className="mt-4 text-xs text-text-4">
+        {live
+          ? 'Live observations are dated and evidence-specific (source + reference). Published analytics are aggregated and reviewed for confidentiality (SPEC §15.2).'
+          : 'Demo — illustrative analytics. Published analytics are aggregated and reviewed for confidentiality (SPEC §15.2).'}
+      </p>
     </div>
   )
 }
