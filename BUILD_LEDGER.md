@@ -77,3 +77,9 @@ Fixes the G2 miss: Fee Engine shipped on default light styling inside the dark a
 ## Wave I — listing review gate (2026-09-26, worker sg-p1-waveI-001, 1 attempt)
 - Integrity hole closed: POST /api/listings forces status='pending' (zod strips client status; DB DEFAULT 'pending' in 0005). PATCH /api/listings/:id/status operator-only (401/403/404 tested); GET ?status=pending operator-only queue. Transitions audited via existing audit_triggered_row trigger. Verified: matcher (0003) + marketplace view (0002) already active-only → pending structurally invisible.
 - Operator UI: /review queue (approve/reject, dark tokens). Floors after: 166/166 root vitest (+7), 121/121 server (+12), build ✓; deployed ab1c209 live; golden 6/6 + e2e 26/26 vs prod post-deploy.
+
+## Wave J — buyer offer-acceptance (2026-09-26, worker sg-p1-waveJ-001, 1 attempt, self-corrected 1 red test in-flight)
+- POST /api/deals/accept buyer-only → offer_accept() (0006): SECURITY DEFINER atomic — 404 unknown / 409 non-active / 200 existing (idempotent per buyer+listing) / 201 created; initial status 'negotiating' (= DEAL_STATUSES[0]); listing.status NEVER mutated (golden-safe). No INSERT audit trigger exists in 0001 — noted per brief, not extended.
+- UI: Accept offer on MatchResults (buyer-only), inline deal confirmation, sg-num ids.
+- Floors: 173/173 root (+7), 130/130 server (+9), build ✓. Deployed b28051c live; golden 6/6 + e2e 26/26 vs prod; route 401-gated on prod; button in prod bundle.
+- Marketplace loop now CLOSED end-to-end: demand → matches → acceptance → deal room.
