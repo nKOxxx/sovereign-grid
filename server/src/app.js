@@ -73,6 +73,9 @@ export function createApp({ pool = defaultPool, logger = console, fetchImpl = gl
     }
     next()
   })
+  // Test hook (mirrors the auth-rate-limiter reset below): lets a suite give
+  // itself a fresh per-test write budget. No-op in production.
+  app.locals.resetWriteRateLimiter = () => writeLimiter.reset()
 
   // Unauthenticated liveness probes — registered before any auth middleware so
   // load balancers / health checks never need a token.

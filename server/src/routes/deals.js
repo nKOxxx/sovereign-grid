@@ -10,13 +10,20 @@
 //   GET  /api/deals/:id            party or operator, else 404
 //   PATCH /api/deals/:id/status    operator only — status transition
 //                                  (audit trigger writes audit_log)
+//   POST /api/deals/:id/transitions  party owned — buyer/seller drive the
+//                                  lifecycle through LEGAL_TRANSITIONS. A
+//                                  transition to `contracted` ALSO writes a
+//                                  real Transacted observation to
+//                                  market_observations (0010) — the moat.
 //   POST /api/deals/:id/approvals  operator only — record an approval decision
 //                                  (audit trigger writes audit_log)
 //   GET/POST /api/deals/:id/messages  parties + operator only
 //
 // Approvals & status changes land in the immutable audit_log via the existing
-// 0001 triggers (trg_approvals_audit, trg_deals_status_audit) — no app code
-// writes audit rows directly. RLS is the tenancy boundary throughout.
+// 0001 triggers (trg_approvals_audit, trg_deals_status_audit); the new
+// party transitions additionally write an explicit action='transition' row via
+// the SECURITY DEFINER audit_log_transition() (0010) — needed because a party
+// has no audit_log INSERT policy. RLS is the tenancy boundary throughout.
 
 import { Router } from 'express'
 import { z } from 'zod'
@@ -29,6 +36,19 @@ const DEAL_STATUSES = [
   'negotiating', 'commercially_agreed', 'conditionally_awarded',
   'contracted', 'delivered', 'cancelled', 'completed',
 ]
+
+// Party-driven lifecycle (POST /api/deals/:id/transitions). The value is the
+// role that may make that move: 'buyer' | 'seller' | 'either'. Statuses absent
+// as a key here (conditionally_awarded, cancelled, completed) are terminal for
+// party moves — `completed` and `cancelled` have no outgoing edge, and a deal
+// parked in `conditionally_awarded` (operator only) stays out of party hands.
+// Exported for tests.
+export const LEGAL_TRANSITIONS = {
+  negotiating: { commercially_agreed: 'seller', cancelled: 'either' },
+  commercially_agreed: { contracted: 'buyer', cancelled: 'either' },
+  contracted: { delivered: 'seller' },
+  delivered: { completed: 'buyer' },
+}
 
 const createDealSchema = z.object({
   name: z.string().trim().min(1).max(200),
@@ -44,6 +64,10 @@ const acceptSchema = z.object({
 
 const statusSchema = z.object({
   status: z.enum(DEAL_STATUSES),
+})
+
+const transitionSchema = z.object({
+  to: z.enum(DEAL_STATUSES),
 })
 
 const approvalSchema = z.object({
@@ -165,6 +189,94 @@ export function createDealsRouter({ pool }) {
         return
       }
       res.status(200).json({ deal: rows[0] })
+    } catch (err) {
+      next(err)
+    }
+  })
+
+  // ---- party-driven transition (buyer/seller only, audited + observed) ------
+  // Parties drive the lifecycle through LEGAL_TRANSITIONS. Operator keeps the
+  // PATCH above. Permission = party of the deal AND the role for that edge
+  // ('buyer' | 'seller' | 'either'). The deal + caller's party role are fetched
+  // under the caller's RLS context (deals_party_select + deal_parties_self_select):
+  // a non-party sees no join row and is rejected 403 regardless of existence
+  // (participant listing already exists via GET /api/deals, so no 404-safety
+  // burden). On success the status UPDATE and the explicit action='transition'
+  // audit row commit together; a land on `contracted` ALSO writes the real
+  // Transacted observation via deal_contract_observation() (0010) in the same
+  // transaction — the moat. A dedupe conflict there is a silent no-op (ON
+  // CONFLICT DO NOTHING); any other DB error propagates and rolls the whole
+  // transition back (correct behavior — the observation must not outlive an
+  // aborted move).
+  router.post('/:id/transitions', requireRole(['buyer', 'seller']), async (req, res, next) => {
+    try {
+      const { id } = paramsId.parse(req.params)
+      const { to } = transitionSchema.parse(req.body)
+      const result = await withUser(req.user.id, req.user.role, async (c) => {
+        const { rows } = await c.query(
+          `SELECT d.id, d.status AS from_status, dp.role AS caller_role
+           FROM deals d
+           JOIN deal_parties dp ON dp.deal_id = d.id AND dp.user_id = $1
+           WHERE d.id = $2`,
+          [req.user.id, id],
+        )
+        const row = rows[0]
+        if (!row) return { outcome: 'forbidden' } // not a party (or no such deal)
+
+        const from = row.from_status
+        const allowed = LEGAL_TRANSITIONS[from]
+        const required = allowed && allowed[to]
+        if (required === undefined) {
+          return { outcome: 'invalid_transition', from, to }
+        }
+        if (required !== 'either' && required !== row.caller_role) {
+          return { outcome: 'wrong_party', from, to, required }
+        }
+
+        const upd = await c.query('UPDATE deals SET status = $1 WHERE id = $2 RETURNING *', [to, id])
+        await c.query('SELECT * FROM audit_log_transition($1, $2, $3, $4)', [req.user.id, id, from, to])
+
+        // Moat: record the real transacted price the instant a deal is
+        // contracted. Dedupe is handled silently by ON CONFLICT DO NOTHING in
+        // the helper; if a unique-violation somehow still escapes we log and
+        // swallow it (never block a transition), any other error rolls back.
+        if (to === 'contracted') {
+          try {
+            await c.query('SELECT * FROM deal_contract_observation($1)', [id])
+          } catch (err) {
+            if (err && err.code === '23505') {
+              console.warn(`transition: duplicate transacted observation for deal ${id} (swallowed)`)
+            } else {
+              throw err
+            }
+          }
+        }
+        return { outcome: 'ok', deal: upd.rows[0], from }
+      }, pool)
+
+      if (result.outcome === 'forbidden') {
+        res.status(403).json({ error: { code: 'forbidden', message: 'Not a party to this deal' } })
+        return
+      }
+      if (result.outcome === 'invalid_transition') {
+        res.status(409).json({
+          error: {
+            code: 'invalid_transition',
+            message: `Cannot transition deal from ${result.from} to ${result.to}`,
+          },
+        })
+        return
+      }
+      if (result.outcome === 'wrong_party') {
+        res.status(403).json({
+          error: {
+            code: 'forbidden',
+            message: `Only the ${result.required === 'either' ? 'buyer or seller' : result.required} may move a deal from ${result.from} to ${result.to}`,
+          },
+        })
+        return
+      }
+      res.status(200).json({ deal: result.deal, from: result.from })
     } catch (err) {
       next(err)
     }
