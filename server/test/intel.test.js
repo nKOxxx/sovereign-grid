@@ -218,7 +218,7 @@ describe('POST /api/intel/ingest/vast — fixture-based, dedupe, allowlist', () 
     const h100sxm = vast.find((o) => o.accelerator === 'H100 SXM')
     expect(h100sxm.price).toBeCloseTo(4.402222222222223 / 3, 10)
     expect(h100sxm.region).toBe('EU')
-    expect(h100sxm.family).toBe('H100 SXM')
+    expect(h100sxm.family).toBe('H100') // taxonomy 0008: 'H100 SXM' -> 'H100'
   })
 
   it('second run of the SAME fixture -> 0 inserted, N updated (dedupe holds)', async () => {

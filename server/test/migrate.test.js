@@ -39,6 +39,7 @@ describe('migrate', () => {
         '0001_init.sql', '0002_auth.sql', '0003_wave_c.sql',
         '0004_wave_c_fix.sql', '0005_listing_review.sql', '0006_deal_accept.sql',
         '0007_market_observations.sql',
+        '0008_market_families.sql',
       ])
     } finally {
       await c.end()

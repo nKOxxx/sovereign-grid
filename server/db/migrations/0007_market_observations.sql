@@ -92,6 +92,11 @@ AS $$
     WHEN accelerator ILIKE '%mi3%'   THEN 'MI300X'
     WHEN accelerator ILIKE '%tpu%'   THEN 'TPU'
     WHEN accelerator ILIKE '%ascend%' OR accelerator ILIKE '%910c%' THEN 'Ascend 910C'
+    WHEN accelerator ILIKE '%h100%' THEN 'H100'
+    WHEN accelerator ILIKE '%a100%' THEN 'A100'
+    WHEN accelerator ILIKE '%gb200%' THEN 'GB200'
+    WHEN accelerator ILIKE '%b200%' THEN 'B200'
+    WHEN accelerator ILIKE '%l40s%' THEN 'L40S'
     ELSE accelerator
   END
 $$;

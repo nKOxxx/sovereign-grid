@@ -129,6 +129,11 @@ export function acceleratorFamily(accel) {
   if (/mi3/i.test(a)) return 'MI300X'
   if (/tpu/i.test(a)) return 'TPU'
   if (/ascend|910c/i.test(a)) return 'Ascend 910C'
+  if (/h100/i.test(a)) return 'H100'
+  if (/a100/i.test(a)) return 'A100'
+  if (/gb200/i.test(a)) return 'GB200'
+  if (/b200/i.test(a)) return 'B200'
+  if (/l40s/i.test(a)) return 'L40S'
   return a || 'Other'
 }
 
