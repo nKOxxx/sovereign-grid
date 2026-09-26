@@ -17,9 +17,9 @@ const SECTION_LABELS = {
 }
 
 const FRESH_STYLE = {
-  fresh: 'bg-emerald-100 text-emerald-800',
-  aging: 'bg-amber-100 text-amber-800',
-  expired: 'bg-rose-100 text-rose-800',
+  fresh: 'bg-[color:var(--sg-success-dim)] text-success',
+  aging: 'bg-[color:var(--sg-warning-dim)] text-warning',
+  expired: 'bg-[color:var(--sg-danger-dim)] text-danger',
 }
 
 export default function CapacityPassport() {
@@ -36,10 +36,10 @@ export default function CapacityPassport() {
     <div className="mx-auto max-w-6xl px-4 py-6">
       <div className="mb-2 flex items-center gap-2">
         <DemoBadge />
-        <span className="text-xs text-slate-500">Evidence-backed asset profiles — every claim shows issuer, date, reviewer, expiry, scope (SPEC §6.3, §11).</span>
+        <span className="text-xs text-text-3">Evidence-backed asset profiles — every claim shows issuer, date, reviewer, expiry, scope (SPEC §6.3, §11).</span>
       </div>
-      <h1 className="text-2xl font-bold text-slate-900">Capacity Passport</h1>
-      <p className="mt-1 max-w-3xl text-sm text-slate-600">
+      <h1 className="sg-display text-2xl">Capacity Passport</h1>
+      <p className="mt-1 max-w-3xl text-sm text-text-2">
         Select a seller to view its verification status, evidence and scores. Verification is capped at “Operationally verified”
         for this demo — no seller is shown with an unearned top status.
       </p>
@@ -52,30 +52,30 @@ export default function CapacityPassport() {
             type="button"
             onClick={() => setSellerId(x.listingId)}
             className={`rounded-md border px-3 py-1.5 text-sm ${
-              x.listingId === sellerId ? 'border-sky-600 bg-sky-600 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+              x.listingId === sellerId ? 'border-transparent bg-accent text-white' : 'border-[color:var(--sg-border)] bg-elevated text-text-2'
             }`}
           >
             {x.sellerName}
-            <span className={x.listingId === sellerId ? 'ml-2 text-white/80' : 'ml-2 text-slate-400'}>{x.verificationStatus}</span>
+            <span className={x.listingId === sellerId ? 'ml-2 text-white/80' : 'ml-2 text-text-4'}>{x.verificationStatus}</span>
           </button>
         ))}
       </div>
 
       {/* Header / ladder / scores */}
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
-        <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2">
+        <section className="sg-card p-5 lg:col-span-2">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
-              <h2 className="text-lg font-semibold text-slate-900">{p.sellerName}</h2>
-              <p className="text-sm text-slate-500">{p.entity}{p.anonymous ? ' (anonymous)' : ''} · {p.accelerator}</p>
+              <h2 className="text-lg font-semibold text-text-1">{p.sellerName}</h2>
+              <p className="text-sm text-text-3">{p.entity}{p.anonymous ? ' (anonymous)' : ''} · {p.accelerator}</p>
             </div>
-            <span className={`rounded-full px-3 py-1 text-xs font-bold ${p.rung >= 3 ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'}`}>
+            <span className={`rounded-full px-3 py-1 text-xs font-bold ${p.rung >= 3 ? 'bg-[color:var(--sg-success-dim)] text-success' : 'bg-elevated text-text-2'}`}>
               {p.verificationStatus}
             </span>
           </div>
 
           {/* Verification ladder */}
-          <h3 className="mt-5 text-xs font-semibold uppercase tracking-wide text-slate-500">Verification status ladder</h3>
+          <h3 className="mt-5 text-xs font-semibold uppercase tracking-wide text-text-3">Verification status ladder</h3>
           <div className="mt-2 flex flex-wrap items-center gap-1">
             {p.ladder.map((step, i) => {
               const rung = i + 1
@@ -85,50 +85,50 @@ export default function CapacityPassport() {
                 <span key={step} className="flex items-center gap-1">
                   <span
                     className={`rounded px-2 py-0.5 text-[11px] font-medium ${
-                      achieved ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-400'
+                      achieved ? 'bg-[color:var(--sg-success-dim)] text-success' : 'bg-elevated text-text-4'
                     }`}
                   >
                     {step}
-                    {cappedAbove && <span className="ml-1 text-[9px] text-amber-600">(demo cap)</span>}
+                    {cappedAbove && <span className="ml-1 text-[9px] text-warning">(demo cap)</span>}
                   </span>
-                  {rung < p.ladder.length && <span className="text-slate-300">→</span>}
+                  {rung < p.ladder.length && <span className="text-text-4">→</span>}
                 </span>
               )
             })}
           </div>
 
           {/* Section coverage */}
-          <h3 className="mt-5 text-xs font-semibold uppercase tracking-wide text-slate-500">Evidence sections</h3>
+          <h3 className="mt-5 text-xs font-semibold uppercase tracking-wide text-text-3">Evidence sections</h3>
           <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
             {p.sections.map((s) => (
-              <div key={s.id} className={`rounded-md border p-2 text-center ${s.covered ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-slate-50'}`}>
-                <div className="text-xs font-medium text-slate-700">{SECTION_LABELS[s.id]}</div>
-                <div className={`mt-0.5 text-[10px] ${s.covered ? 'text-emerald-700' : 'text-slate-400'}`}>{s.covered ? 'covered' : 'no evidence yet'}</div>
+              <div key={s.id} className={`rounded-md border p-2 text-center ${s.covered ? 'border-[color:var(--sg-success)] bg-[color:var(--sg-success-dim)]' : 'border-[color:var(--sg-border)] bg-elevated'}`}>
+                <div className="text-xs font-medium text-text-2">{SECTION_LABELS[s.id]}</div>
+                <div className={`mt-0.5 text-[10px] ${s.covered ? 'text-success' : 'text-text-4'}`}>{s.covered ? 'covered' : 'no evidence yet'}</div>
               </div>
             ))}
           </div>
         </section>
 
         {/* Scores */}
-        <section className="rounded-lg border border-amber-200 bg-amber-50/40 p-5 shadow-sm">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Scores</h2>
-          <span className="mt-1 inline-block rounded bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-800">demo</span>
+        <section className="rounded-md border border-[color:var(--sg-warning)] bg-[color:var(--sg-warning-dim)] p-5">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-text-3">Scores</h2>
+          <span className="mt-1 inline-block rounded bg-[color:var(--sg-warning-dim)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-warning">demo</span>
           <div className="mt-3 space-y-3 text-sm">
             <ScoreRow label="Evidence confidence" value={p.confidence} />
             <ScoreRow label="Evidence coverage" value={p.evidenceCoveragePct} />
-            <div className="rounded-md border border-amber-200 bg-white p-3 text-xs text-slate-600">
-              <div className="font-semibold uppercase tracking-wide text-slate-500">Methodology version</div>
-              <div className="mt-1 text-base font-bold text-slate-900">{p.methodologyVersion}</div>
+            <div className="rounded-md border border-[color:var(--sg-warning)] bg-elevated p-3 text-xs text-text-2">
+              <div className="font-semibold uppercase tracking-wide text-text-3">Methodology version</div>
+              <div className="sg-num mt-1 text-base font-bold text-text-1">{p.methodologyVersion}</div>
             </div>
           </div>
-          <p className="mt-3 text-xs text-slate-500">Scores summarize reviewed evidence — they never replace the underlying record (SPEC §11.2).</p>
+          <p className="mt-3 text-xs text-text-3">Scores summarize reviewed evidence — they never replace the underlying record (SPEC §11.2).</p>
         </section>
       </div>
 
       {/* Per-accelerator technical / portability (D16) */}
       {profile && (
-        <section className="mt-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Accelerator compatibility & portability (D16)</h2>
+        <section className="sg-card mt-6 p-5">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-text-3">Accelerator compatibility & portability (D16)</h2>
           <div className="mt-3 grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
             <Block label="Frameworks" value={profile.frameworks.length ? profile.frameworks.join(', ') : '—'} />
             <Block label="Compilers" value={profile.compilers.length ? profile.compilers.join(', ') : '—'} />
@@ -137,20 +137,20 @@ export default function CapacityPassport() {
             <Block label="Portability" value={profile.portability || '—'} />
             <Block label="Migration effort" value={profile.migrationEffort || '—'} />
             <div className="sm:col-span-2">
-              <div className="text-xs font-medium text-slate-500">Portability notes</div>
-              <p className="mt-0.5 text-xs text-slate-600">{profile.portabilityNotes || '—'}</p>
+              <div className="text-xs font-medium text-text-3">Portability notes</div>
+              <p className="mt-0.5 text-xs text-text-2">{profile.portabilityNotes || '—'}</p>
             </div>
           </div>
         </section>
       )}
 
       {/* Evidence items */}
-      <section className="mt-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Evidence</h2>
+      <section className="sg-card mt-6 p-5">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-text-3">Evidence</h2>
         <div className="mt-3 overflow-x-auto">
           <table className="w-full min-w-[640px] border-collapse text-sm">
             <thead>
-              <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
+              <tr className="border-b border-[color:var(--sg-border)] text-left text-xs uppercase tracking-wide text-text-3">
                 <th className="px-3 py-2">Evidence</th>
                 <th className="px-3 py-2">Issuer</th>
                 <th className="px-3 py-2">Date</th>
@@ -162,30 +162,30 @@ export default function CapacityPassport() {
             </thead>
             <tbody>
               {p.evidence.map((e) => (
-                <tr key={e.type} className="border-b border-slate-100">
-                  <td className="px-3 py-2 font-medium text-slate-800">{e.label}</td>
-                  <td className="px-3 py-2 text-slate-600">{e.issuer}</td>
-                  <td className="px-3 py-2 text-slate-600">{e.date}</td>
-                  <td className="px-3 py-2 text-slate-600">{e.reviewer}</td>
-                  <td className="px-3 py-2 text-xs text-slate-500">{e.scope}</td>
-                  <td className="px-3 py-2 text-slate-600">{e.expiry}</td>
+                <tr key={e.type} className="border-b border-[color:var(--sg-border)]">
+                  <td className="px-3 py-2 font-medium text-text-1">{e.label}</td>
+                  <td className="px-3 py-2 text-text-2">{e.issuer}</td>
+                  <td className="px-3 py-2 text-text-2">{e.date}</td>
+                  <td className="px-3 py-2 text-text-2">{e.reviewer}</td>
+                  <td className="px-3 py-2 text-xs text-text-3">{e.scope}</td>
+                  <td className="px-3 py-2 text-text-2">{e.expiry}</td>
                   <td className="px-3 py-2">
                     <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${FRESH_STYLE[e.freshness]}`}>{e.freshness}</span>
                   </td>
                 </tr>
               ))}
               {p.evidence.length === 0 && (
-                <tr><td colSpan={7} className="px-3 py-4 text-center text-slate-500">No evidence on file.</td></tr>
+                <tr><td colSpan={7} className="px-3 py-4 text-center text-text-3">No evidence on file.</td></tr>
               )}
             </tbody>
           </table>
         </div>
-        <p className="mt-3 text-xs text-slate-500">
+        <p className="mt-3 text-xs text-text-3">
           Expired or aging evidence reduces listing confidence and may block new transactions until refreshed (SPEC §6.3).
         </p>
       </section>
 
-      <p className="mt-4 text-xs text-slate-400">{DEMO_NOTE}</p>
+      <p className="mt-4 text-xs text-text-4">{DEMO_NOTE}</p>
     </div>
   )
 }
@@ -193,12 +193,12 @@ export default function CapacityPassport() {
 function ScoreRow({ label, value }) {
   return (
     <div>
-      <div className="flex items-center justify-between text-xs text-slate-500">
+      <div className="flex items-center justify-between text-xs text-text-3">
         <span>{label}</span>
-        <span className="font-semibold text-slate-700">{value}%</span>
+        <span className="sg-num font-semibold text-text-1">{value}%</span>
       </div>
-      <div className="mt-1 h-2 overflow-hidden rounded bg-slate-200">
-        <div className="h-full bg-sky-500" style={{ width: `${Math.min(100, value)}%` }} />
+      <div className="mt-1 h-2 overflow-hidden rounded bg-elevated">
+        <div className="h-full bg-accent" style={{ width: `${Math.min(100, value)}%` }} />
       </div>
     </div>
   )
@@ -207,8 +207,8 @@ function ScoreRow({ label, value }) {
 function Block({ label, value }) {
   return (
     <div>
-      <div className="text-xs font-medium text-slate-500">{label}</div>
-      <p className="mt-0.5 text-xs text-slate-700">{value}</p>
+      <div className="text-xs font-medium text-text-3">{label}</div>
+      <p className="mt-0.5 text-xs text-text-2">{value}</p>
     </div>
   )
 }

@@ -7,11 +7,9 @@ import { useNavigate } from 'react-router-dom'
 import { login, register, logout, getCurrentUser } from '../lib/auth.js'
 import { DemoBadge, Field, inputCls } from './ui.jsx'
 
-// Seeded demo accounts (server `npm run seed`).
-export const DEMO_CREDS = [
-  { role: 'Buyer (Project Falcon)', email: 'falcon@demo.local', password: 'sg-falcon-dev' },
-  { role: 'Operator', email: 'operator@sg.local', password: 'sg-operator-dev' },
-]
+// Seeded demo buyer account (server `npm run seed`). Operator accounts are
+// provisioned by admins and are invite-only in this demo.
+export const DEMO_CREDS = [{ role: 'Buyer (Project Falcon)', email: 'falcon@demo.local', password: 'sg-falcon-dev' }]
 
 const MODE_LABELS = { login: 'Log in', register: 'Create account' }
 
@@ -55,19 +53,19 @@ export default function Login() {
   if (user) {
     return (
       <div className="mx-auto max-w-md px-4 py-10">
-        <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="sg-card p-6">
           <DemoBadge label="AUTHENTICATED" />
-          <h1 className="mt-2 text-xl font-bold text-slate-900">Signed in</h1>
-          {user.email && <p className="mt-1 text-sm text-slate-600">{user.email}</p>}
+          <h1 className="sg-display mt-2 text-xl">Signed in</h1>
+          {user.email && <p className="mt-1 text-sm text-text-2">{user.email}</p>}
           {user.role && (
-            <span className="mt-2 inline-block rounded bg-sky-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-sky-700">
+            <span className="mt-2 inline-block rounded bg-[color:var(--sg-accent-dim)] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-accent">
               {user.role}
             </span>
           )}
           <button
             type="button"
             onClick={handleLogout}
-            className="mt-6 rounded-md bg-slate-700 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+            className="sg-btn bg-elevated mt-6 px-4 py-2 text-sm font-semibold text-text-1 hover:bg-[color:var(--sg-border)]"
           >
             Log out
           </button>
@@ -80,15 +78,15 @@ export default function Login() {
     <div className="mx-auto max-w-md px-4 py-10">
       <div className="mb-3 flex items-center gap-2">
         <DemoBadge />
-        <span className="text-xs text-slate-500">Live API authentication — demo credentials below.</span>
+        <span className="text-xs text-text-3">Live API authentication — demo credentials below.</span>
       </div>
-      <h1 className="text-2xl font-bold text-slate-900">Sign in to Sovereign Grid</h1>
-      <p className="mt-1 text-sm text-slate-600">
+      <h1 className="sg-display text-2xl">Sign in to Sovereign Grid</h1>
+      <p className="mt-1 text-sm text-text-2">
         Requests and matches need an authenticated buyer. In the demo you can use the seeded Falcon account to run the
         golden path (matches 93 / 90 / 87).
       </p>
 
-      <div className="mt-6 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="sg-card mt-6 p-6">
         <div className="mb-4 flex gap-2">
           {(['login', 'register']).map((m) => (
             <button
@@ -99,7 +97,7 @@ export default function Login() {
                 setError(null)
               }}
               className={`rounded-md px-3 py-1.5 text-sm ${
-                mode === m ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                mode === m ? 'bg-accent text-white' : 'border border-[color:var(--sg-border)] bg-elevated text-text-2'
               }`}
             >
               {MODE_LABELS[m]}
@@ -110,7 +108,7 @@ export default function Login() {
         <form onSubmit={submit} className="space-y-4">
           {mode === 'register' && (
             <div>
-              <span className="mb-1 block text-xs font-medium text-slate-600">Role</span>
+              <span className="mb-1 block text-xs font-medium text-text-3">Role</span>
               <div className="flex gap-2">
                 {['buyer', 'seller'].map((r) => (
                   <button
@@ -118,7 +116,7 @@ export default function Login() {
                     type="button"
                     onClick={() => setRole(r)}
                     className={`rounded-md px-3 py-1.5 text-sm capitalize ${
-                      role === r ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-700'
+                      role === r ? 'bg-accent text-white' : 'border border-[color:var(--sg-border)] bg-elevated text-text-2'
                     }`}
                   >
                     {r}
@@ -148,30 +146,31 @@ export default function Login() {
             />
           </Field>
           {error && (
-            <p className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>
+            <p className="rounded-md border border-[color:var(--sg-danger)] bg-[color:var(--sg-danger-dim)] px-3 py-2 text-sm text-danger">{error}</p>
           )}
           <button
             type="submit"
             disabled={busy}
-            className="w-full rounded-md bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
+            className="sg-btn sg-btn--primary w-full px-4 py-2 text-sm font-semibold disabled:opacity-50"
           >
             {busy ? 'Working…' : MODE_LABELS[mode]}
           </button>
         </form>
       </div>
 
-      <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50 p-4">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-amber-800">Demo credentials</h2>
-        <ul className="mt-2 space-y-1.5 text-xs text-amber-900">
+      <div className="mt-5 rounded-lg border border-[color:var(--sg-warning)] bg-[color:var(--sg-warning-dim)] p-4">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-warning">Demo credentials</h2>
+        <ul className="mt-2 space-y-1.5 text-xs text-warning">
           {DEMO_CREDS.map((c) => (
             <li key={c.email} className="flex flex-wrap items-center justify-between gap-2">
               <span className="font-medium">{c.role}</span>
-              <span className="font-mono">
+              <span className="sg-num font-mono">
                 {c.email} / {c.password}
               </span>
             </li>
           ))}
         </ul>
+        <p className="mt-2 text-xs text-text-2">Operator console is invite-only in this demo.</p>
       </div>
     </div>
   )

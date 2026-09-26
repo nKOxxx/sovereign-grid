@@ -61,11 +61,11 @@ const APPROVED_RECORD = {
 }
 
 const STATUS_STYLE = {
-  preScreened: 'bg-emerald-100 text-emerald-800',
-  needsEvidence: 'bg-amber-100 text-amber-800',
-  conditional: 'bg-sky-100 text-sky-800',
-  hold: 'bg-rose-100 text-rose-800',
-  approvedByReviewer: 'bg-emerald-100 text-emerald-800',
+  preScreened: 'bg-[color:var(--sg-success-dim)] text-success',
+  needsEvidence: 'bg-[color:var(--sg-warning-dim)] text-warning',
+  conditional: 'bg-[color:var(--sg-accent-dim)] text-accent',
+  hold: 'bg-[color:var(--sg-danger-dim)] text-danger',
+  approvedByReviewer: 'bg-[color:var(--sg-success-dim)] text-success',
 }
 
 export default function Eligibility() {
@@ -78,10 +78,10 @@ export default function Eligibility() {
     <div className="mx-auto max-w-5xl px-4 py-6">
       <div className="mb-2 flex items-center gap-2">
         <DemoBadge />
-        <span className="text-xs text-slate-500">Pre-screening results for {goldenRequest.name} — not legal advice or legal clearance.</span>
+        <span className="text-xs text-text-3">Pre-screening results for {goldenRequest.name} — not legal advice or legal clearance.</span>
       </div>
-      <h1 className="text-2xl font-bold text-slate-900">Eligibility Result — {goldenRequest.name}</h1>
-      <p className="mt-1 max-w-3xl text-sm text-slate-600">
+      <h1 className="sg-display text-2xl">Eligibility Result — {goldenRequest.name}</h1>
+      <p className="mt-1 max-w-3xl text-sm text-text-2">
         Route-specific screening of candidate offers. Chinese capacity is included as eligible supply but every transaction
         carries its own evidence-driven decision (SPEC §10, D15).
       </p>
@@ -94,38 +94,38 @@ export default function Eligibility() {
       </div>
 
       {/* Approved by reviewer record (SPEC §10.3) */}
-      <section className="mt-6 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+      <section className="mt-6 rounded-lg border border-[color:var(--sg-success)] bg-[color:var(--sg-success-dim)] p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="font-semibold text-emerald-900">Approved by reviewer</h2>
-          <span className="rounded bg-emerald-600 px-2.5 py-1 text-xs font-bold text-white">{APPROVED_RECORD.listing.name}</span>
+          <h2 className="font-semibold text-success">Approved by reviewer</h2>
+          <span className="rounded bg-[color:var(--sg-success)] px-2.5 py-1 text-xs font-bold text-white">{APPROVED_RECORD.listing.name}</span>
         </div>
         <dl className="mt-3 grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
-          <div><dt className="text-xs text-emerald-700">Reviewer</dt><dd className="font-medium text-emerald-900">{APPROVED_RECORD.reviewer}</dd></div>
-          <div><dt className="text-xs text-emerald-700">Scope</dt><dd className="font-medium text-emerald-900">{APPROVED_RECORD.scope}</dd></div>
-          <div><dt className="text-xs text-emerald-700">Timestamp</dt><dd className="font-medium text-emerald-900">{APPROVED_RECORD.timestamp}</dd></div>
-          <div><dt className="text-xs text-emerald-700">Expiry</dt><dd className="font-medium text-emerald-900">{APPROVED_RECORD.expiry}</dd></div>
+          <div><dt className="text-xs text-success">Reviewer</dt><dd className="font-medium text-success">{APPROVED_RECORD.reviewer}</dd></div>
+          <div><dt className="text-xs text-success">Scope</dt><dd className="font-medium text-success">{APPROVED_RECORD.scope}</dd></div>
+          <div><dt className="text-xs text-success">Timestamp</dt><dd className="font-medium text-success">{APPROVED_RECORD.timestamp}</dd></div>
+          <div><dt className="text-xs text-success">Expiry</dt><dd className="font-medium text-success">{APPROVED_RECORD.expiry}</dd></div>
         </dl>
-        <p className="mt-2 text-xs text-emerald-700">Conditions: {APPROVED_RECORD.conditions}</p>
+        <p className="mt-2 text-xs text-success">Conditions: {APPROVED_RECORD.conditions}</p>
       </section>
 
       {/* Human approval gate (SPEC §10.3, §10.4) */}
-      <section className="mt-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Human approval gate — conditional award</h2>
-        <p className="mt-1 text-sm text-slate-600">
+      <section className="sg-card mt-6 p-5">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-text-3">Human approval gate — conditional award</h2>
+        <p className="mt-1 text-sm text-text-2">
           The UAE failover offer (GulfGrid H200) is conditionally awarded. A reviewer must approve or request documents before it
           can progress. High-risk decisions retain an explicit human gate (SPEC §22).
         </p>
-        <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm">
+        <div className="mt-3 rounded-md border border-[color:var(--sg-border)] bg-elevated p-3 text-sm">
           <div className="flex flex-wrap items-center gap-2">
             <span>Current status:</span>
-            <span className={`rounded px-2 py-0.5 text-xs font-bold ${STATUS_STYLE[gate.status] || 'bg-slate-100 text-slate-700'}`}>{OUTCOME_LABELS[gate.status]}</span>
-            {gate.docsRequested && <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">docs requested</span>}
+            <span className={`rounded px-2 py-0.5 text-xs font-bold ${STATUS_STYLE[gate.status] || 'bg-elevated text-text-2'}`}>{OUTCOME_LABELS[gate.status]}</span>
+            {gate.docsRequested && <span className="rounded bg-[color:var(--sg-warning-dim)] px-2 py-0.5 text-xs font-medium text-warning">docs requested</span>}
           </div>
           {gate.status === 'needsEvidence' && gate.docsRequested && (
-            <p className="mt-2 text-xs text-amber-700">Documents have been requested; the offer is on hold pending evidence.</p>
+            <p className="mt-2 text-xs text-warning">Documents have been requested; the offer is on hold pending evidence.</p>
           )}
           {gate.status === 'approvedByReviewer' && (
-            <p className="mt-2 text-xs text-emerald-700">
+            <p className="mt-2 text-xs text-success">
               Approved by R. Haddad (Compliance) — scope: UAE failover access-control evidence for zero-data-retention handling.
             </p>
           )}
@@ -134,14 +134,14 @@ export default function Eligibility() {
           <button
             type="button"
             onClick={approve}
-            className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+            className="sg-btn sg-btn--primary px-4 py-2 text-sm"
           >
             Approve
           </button>
           <button
             type="button"
             onClick={requestDocs}
-            className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            className="rounded-md border border-[color:var(--sg-border)] bg-elevated px-4 py-2 text-sm font-semibold text-text-2"
           >
             Request docs
           </button>
@@ -150,7 +150,7 @@ export default function Eligibility() {
 
       <OperatorCaseQueue />
 
-      <p className="mt-4 text-xs text-slate-400">
+      <p className="mt-4 text-xs text-text-4">
         {DEMO_NOTE} Pre-screening only — not legal clearance (SPEC §19, §22.1).
       </p>
     </div>
@@ -205,10 +205,10 @@ const SEED_CASES = [
 ]
 
 const CASE_STYLE = {
-  open: 'bg-sky-100 text-sky-800',
-  conditional: 'bg-amber-100 text-amber-800',
-  approved: 'bg-emerald-100 text-emerald-800',
-  rejected: 'bg-rose-100 text-rose-800',
+  open: 'bg-[color:var(--sg-accent-dim)] text-accent',
+  conditional: 'bg-[color:var(--sg-warning-dim)] text-warning',
+  approved: 'bg-[color:var(--sg-success-dim)] text-success',
+  rejected: 'bg-[color:var(--sg-danger-dim)] text-danger',
 }
 
 function OperatorCaseQueue() {
@@ -274,52 +274,52 @@ function OperatorCaseQueue() {
   const setD = (id, patch) => setDraft((prev) => ({ ...prev, [id]: { ...(prev[id] || {}), ...patch } }))
 
   return (
-    <section className="mt-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm" data-testid="operator-case-queue">
+    <section className="sg-card mt-6 p-5" data-testid="operator-case-queue">
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Operator case queue</h2>
-        <span className="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">operator only</span>
-        <span className="ml-auto text-xs text-slate-400">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-text-3">Operator case queue</h2>
+        <span className="rounded bg-elevated px-2 py-0.5 text-[10px] font-semibold text-text-3">operator only</span>
+        <span className="ml-auto text-xs text-text-4">
           signed in as <b>{operatorLabel(user)}</b>
         </span>
       </div>
 
       <div className="space-y-3">
         {cases.map((c) => (
-          <div key={c.id} className="rounded-lg border border-slate-200 p-4" data-testid={`case-${c.id}`}>
+          <div key={c.id} className="rounded-lg border border-[color:var(--sg-border)] bg-elevated p-4" data-testid={`case-${c.id}`}>
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="font-semibold text-slate-900">{c.listingName}</div>
-              <span className={`rounded px-2.5 py-1 text-xs font-bold ${CASE_STYLE[c.status] || 'bg-slate-100 text-slate-700'}`}>
+              <div className="font-semibold text-text-1">{c.listingName}</div>
+              <span className={`rounded px-2.5 py-1 text-xs font-bold ${CASE_STYLE[c.status] || 'bg-elevated text-text-2'}`}>
                 {CASE_STATUS_LABELS[c.status] || c.status}
               </span>
             </div>
 
             {c.status === 'conditional' && c.missing.length > 0 && (
-              <p className="mt-2 text-xs text-amber-700">Missing evidence: {c.missing.join(', ')}</p>
+              <p className="mt-2 text-xs text-warning">Missing evidence: {c.missing.join(', ')}</p>
             )}
             {c.evidence.length > 0 && (
-              <p className="mt-2 text-xs text-slate-500">
+              <p className="mt-2 text-xs text-text-3">
                 Evidence on file: {c.evidence.map((e) => `${e.type}${e.issuer ? ` (${e.issuer})` : ''}`).join(', ')}
               </p>
             )}
 
             {(c.decidedBy || c.decidedAt) && (
-              <p className="mt-2 text-xs text-slate-500">
+              <p className="mt-2 text-xs text-text-3">
                 <span className="font-semibold">Decision by {c.decidedBy}</span> · {decisionStamp(c.decidedAt)}
               </p>
             )}
-            {c._note && <p className="mt-1 text-xs text-rose-600">{c._note} — applied locally (demo/offline).</p>}
+            {c._note && <p className="mt-1 text-xs text-danger">{c._note} — applied locally (demo/offline).</p>}
 
             {c.status !== 'approved' && c.status !== 'rejected' && (
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <input
-                  className="w-48 rounded-md border border-slate-300 px-2 py-1 text-sm"
+                  className="w-48 rounded-md border border-[color:var(--sg-border)] bg-elevated px-2 py-1 text-sm"
                   placeholder="evidence type (e.g. zeroDataRetention)"
                   value={(draft[c.id] || {}).type || ''}
                   onChange={(e) => setD(c.id, { type: e.target.value })}
                   data-testid={`ev-type-${c.id}`}
                 />
                 <input
-                  className="w-40 rounded-md border border-slate-300 px-2 py-1 text-sm"
+                  className="w-40 rounded-md border border-[color:var(--sg-border)] bg-elevated px-2 py-1 text-sm"
                   placeholder="issuer"
                   value={(draft[c.id] || {}).issuer || ''}
                   onChange={(e) => setD(c.id, { issuer: e.target.value })}
@@ -328,7 +328,7 @@ function OperatorCaseQueue() {
                   type="button"
                   onClick={() => onAttach(c)}
                   disabled={busy === c.id}
-                  className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                  className="rounded-md border border-[color:var(--sg-border)] bg-elevated px-3 py-1.5 text-sm font-medium text-text-2 disabled:opacity-50"
                 >
                   Attach evidence
                 </button>
@@ -336,7 +336,7 @@ function OperatorCaseQueue() {
                   type="button"
                   onClick={() => onApprove(c)}
                   disabled={busy === c.id}
-                  className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                  className="sg-btn sg-btn--primary px-3 py-1.5 text-sm disabled:opacity-50"
                   data-testid={`approve-${c.id}`}
                 >
                   Approve
@@ -345,7 +345,7 @@ function OperatorCaseQueue() {
                   type="button"
                   onClick={() => onReject(c)}
                   disabled={busy === c.id}
-                  className="rounded-md border border-rose-300 bg-white px-3 py-1.5 text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+                  className="rounded-md border border-[color:var(--sg-danger)] bg-elevated px-3 py-1.5 text-sm font-semibold text-danger disabled:opacity-50"
                   data-testid={`reject-${c.id}`}
                 >
                   Reject
@@ -362,20 +362,20 @@ function OperatorCaseQueue() {
 function DecisionCard({ d }) {
   const l = d.listing
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="sg-card p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="font-semibold text-slate-900">{l.name}</h3>
+        <h3 className="font-semibold text-text-1">{l.name}</h3>
         <span className={`rounded px-2.5 py-1 text-xs font-bold ${STATUS_STYLE[d.status]}`}>{OUTCOME_LABELS[d.status]}</span>
       </div>
-      <p className="mt-1 text-sm text-slate-600">
+      <p className="mt-1 text-sm text-text-2">
         {l.accelerator.model} · {l.facility.country} · {l.facility.region}
       </p>
-      <p className="mt-2 text-sm text-slate-700">{d.summary}</p>
+      <p className="mt-2 text-sm text-text-2">{d.summary}</p>
       {d.conditions && d.conditions.length > 0 && (
         <ul className="mt-2 space-y-1">
           {d.conditions.map((c) => (
-            <li key={c} className="flex items-start gap-1.5 text-sm text-sky-800">
-              <span className="mt-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-sky-500" />
+            <li key={c} className="flex items-start gap-1.5 text-sm text-accent">
+              <span className="mt-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
               {c}
             </li>
           ))}

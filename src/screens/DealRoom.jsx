@@ -16,9 +16,9 @@ import {
 } from '../lib/operator.js'
 
 const ROLE_STYLES = {
-  buyer: { bg: 'bg-sky-50', border: 'border-sky-200', name: 'text-sky-800', align: 'self-start' },
-  seller: { bg: 'bg-emerald-50', border: 'border-emerald-200', name: 'text-emerald-800', align: 'self-end' },
-  operator: { bg: 'bg-slate-100', border: 'border-slate-200', name: 'text-slate-700', align: 'self-start' },
+  buyer: { bg: 'bg-[color:var(--sg-accent-dim)]', border: 'border-[color:var(--sg-accent)]', name: 'text-accent', align: 'self-start' },
+  seller: { bg: 'bg-[color:var(--sg-success-dim)]', border: 'border-[color:var(--sg-success)]', name: 'text-success', align: 'self-end' },
+  operator: { bg: 'bg-elevated', border: 'border-[color:var(--sg-border)]', name: 'text-text-2', align: 'self-start' },
 }
 
 const fmtDate = (iso) => {
@@ -92,51 +92,51 @@ function ConnectionGate({ status, apiStatus, onRequest, onApprove }) {
         <DemoBadge />
         {apiStatus === 'offline' && <OfflineBadge />}
         {apiStatus === 'live' && (
-          <span className="rounded bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold tracking-wide text-emerald-700">
+          <span className="rounded bg-[color:var(--sg-success-dim)] px-2 py-0.5 text-[11px] font-semibold tracking-wide text-success">
             live API
           </span>
         )}
-        <span className="text-xs text-slate-500">Deal room — connection first, then deal room (SPEC §16.4).</span>
+        <span className="text-xs text-text-3">Deal room — connection first, then deal room (SPEC §16.4).</span>
       </div>
-      <h1 className="text-2xl font-bold text-slate-900">Deal Room — Project Falcon</h1>
-      <p className="mt-2 text-sm text-slate-600">
+      <h1 className="sg-display text-2xl">Deal Room — Project Falcon</h1>
+      <p className="mt-2 text-sm text-text-2">
         Connecting buyer (Project Falcon) with seller <b>Nordic Vector Compute OY</b> for 256× H200, EU primary + UAE
         failover. The room is only opened after both parties approve the connection.
       </p>
 
-      <div className="mt-6 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="sg-card mt-6 p-6">
         {status === 'none' && (
           <div className="text-center">
-            <p className="mb-4 text-sm text-slate-600">No connection has been requested yet for this deal.</p>
+            <p className="mb-4 text-sm text-text-2">No connection has been requested yet for this deal.</p>
             <button
               type="button"
               onClick={onRequest}
-              className="rounded-md bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700"
+              className="sg-btn sg-btn--primary px-4 py-2 text-sm"
             >
               Request connection
             </button>
-            <p className="mt-3 text-xs text-slate-400">Demo: requesting opens the approval state below.</p>
+            <p className="mt-3 text-xs text-text-4">Demo: requesting opens the approval state below.</p>
           </div>
         )}
 
         {status === 'pending' && (
           <div>
             <div className="flex items-center gap-2">
-              <span className="inline-block h-2.5 w-2.5 animate-pulse rounded-full bg-amber-500" />
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-amber-700">Connection request pending approval</h2>
-              <span className="rounded bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-800">demo</span>
+              <span className="inline-block h-2.5 w-2.5 animate-pulse rounded-full bg-[color:var(--sg-warning)]" />
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-warning">Connection request pending approval</h2>
+              <span className="rounded bg-[color:var(--sg-warning-dim)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-warning">demo</span>
             </div>
-            <p className="mt-2 text-sm text-slate-600">
+            <p className="mt-2 text-sm text-text-2">
               Request sent. Buyer and seller must both approve before the deal room (messages, documents, milestones) is
               opened. No sensitive material is visible until then.
             </p>
-            <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+            <div className="mt-4 rounded-md border border-[color:var(--sg-warning)] bg-[color:var(--sg-warning-dim)] p-3 text-sm text-warning">
               <b>Approve to open the deal room</b> — demo represents both counterparties accepting the connection.
             </div>
             <button
               type="button"
               onClick={onApprove}
-              className="mt-4 rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+              className="sg-btn sg-btn--primary mt-4 px-4 py-2 text-sm"
             >
               Approve connection & open deal room
             </button>
@@ -168,10 +168,10 @@ function Room({ deal, liveFalcon, liveDeals, apiStatus }) {
       <Header deal={deal} liveFalcon={liveFalcon} liveDeals={liveDeals} apiStatus={apiStatus} />
 
       {/* Milestone tracker (SPEC §12.2) */}
-      <section className="mt-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      <section className="sg-card mt-6 p-5">
         <div className="mb-3 flex items-center justify-between gap-2 flex-wrap">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Transaction milestone</h2>
-          <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-text-3">Transaction milestone</h2>
+          <span className="rounded bg-[color:var(--sg-warning-dim)] px-2 py-0.5 text-xs font-semibold text-warning">
             Current: {MILESTONE_LABELS[deal.milestones.current]}
           </span>
         </div>
@@ -182,27 +182,27 @@ function Room({ deal, liveFalcon, liveDeals, apiStatus }) {
                 <span
                   className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
                     m.status === 'done'
-                      ? 'bg-emerald-600 text-white'
+                      ? 'bg-[color:var(--sg-success)] text-white'
                       : m.status === 'current'
-                        ? 'bg-sky-600 text-white ring-2 ring-sky-300'
-                        : 'bg-slate-200 text-slate-500'
+                        ? 'bg-accent text-white ring-2 ring-[color:var(--sg-accent-hover)]'
+                        : 'bg-elevated text-text-4'
                   }`}
                 >
                   {m.status === 'done' ? '✓' : i + 1}
                 </span>
                 <span
                   className={`whitespace-nowrap text-xs ${
-                    m.status === 'current' ? 'font-semibold text-sky-800' : m.status === 'done' ? 'text-emerald-700' : 'text-slate-500'
+                    m.status === 'current' ? 'font-semibold text-accent' : m.status === 'done' ? 'text-success' : 'text-text-3'
                   }`}
                 >
                   {m.label}
                 </span>
               </div>
-              {i < track.length - 1 && <span className={`mx-1 h-px w-4 sm:w-6 ${i < currentIdx ? 'bg-emerald-400' : 'bg-slate-200'}`} />}
+              {i < track.length - 1 && <span className={`mx-1 h-px w-4 sm:w-6 ${i < currentIdx ? 'bg-[color:var(--sg-success)]' : 'bg-elevated'}`} />}
             </li>
           ))}
         </ol>
-        <p className="mt-3 text-xs text-slate-500">
+        <p className="mt-3 text-xs text-text-3">
           Project Falcon is <b>Conditionally awarded</b>: contract, provisioning and settlement milestones remain. Deposit &
           invoice rows below are status-only — no custody, no payment processing in the demo (SPEC §12.3).
         </p>
@@ -222,7 +222,7 @@ function Room({ deal, liveFalcon, liveDeals, apiStatus }) {
         {/* Middle: message thread */}
         <div className="space-y-6 lg:col-span-1">
           <MessageThread deal={deal} />
-          <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+          <div className="sg-card p-3">
             <textarea
               className={inputCls}
               rows={2}
@@ -233,7 +233,7 @@ function Room({ deal, liveFalcon, liveDeals, apiStatus }) {
             <button
               type="button"
               onClick={postMessage}
-              className="mt-2 rounded-md bg-sky-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-sky-700"
+              className="sg-btn sg-btn--primary mt-2 px-3 py-1.5 text-sm"
             >
               Send
             </button>
@@ -257,17 +257,17 @@ function Header({ deal, liveFalcon, liveDeals, apiStatus }) {
       <DemoBadge />
       {apiStatus === 'offline' && <OfflineBadge />}
       {apiStatus === 'live' && (
-        <span className="rounded bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold tracking-wide text-emerald-700">
+        <span className="rounded bg-[color:var(--sg-success-dim)] px-2 py-0.5 text-[11px] font-semibold tracking-wide text-success">
           live deals: {Array.isArray(liveDeals) ? liveDeals.length : 0}
         </span>
       )}
-      <span className="text-xs text-slate-500">Deal room — DEMO content. Statuses only; no live transaction.</span>
+      <span className="text-xs text-text-3">Deal room — DEMO content. Statuses only; no live transaction.</span>
       {liveFalcon && apiStatus === 'live' && (
-        <span className="rounded bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600">
+        <span className="rounded bg-elevated px-2 py-0.5 text-[11px] text-text-3">
           live Falcon deal: {liveFalcon.status || '—'}
         </span>
       )}
-      <span className="ml-auto rounded bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-800">
+      <span className="ml-auto rounded bg-[color:var(--sg-warning-dim)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-warning">
         negotiation: {deal.offer.status}
       </span>
     </div>
@@ -276,9 +276,9 @@ function Header({ deal, liveFalcon, liveDeals, apiStatus }) {
 
 function Section({ title, right, children }) {
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <section className="sg-card p-4">
       <div className="mb-3 flex items-center justify-between gap-2">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">{title}</h3>
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-text-3">{title}</h3>
         {right}
       </div>
       {children}
@@ -290,17 +290,17 @@ function Participants({ deal }) {
   return (
     <Section
       title="Participants & permissions"
-      right={<span className="text-[10px] text-slate-400">{deal.participants.length} parties</span>}
+      right={<span className="text-[10px] text-text-4">{deal.participants.length} parties</span>}
     >
       <ul className="space-y-2">
         {deal.participants.map((p) => (
           <li key={p.id} className="flex items-start gap-2 text-sm">
-            <span className="mt-0.5 inline-block h-2 w-2 shrink-0 rounded-full bg-sky-500" />
+            <span className="mt-0.5 inline-block h-2 w-2 shrink-0 rounded-full bg-accent" />
             <div>
-              <div className="font-medium text-slate-800">
-                {p.role} <span className="text-xs font-normal text-slate-400">· {p.identity}</span>
+              <div className="font-medium text-text-1">
+                {p.role} <span className="text-xs font-normal text-text-4">· {p.identity}</span>
               </div>
-              <div className="text-xs text-slate-500">{p.contact}</div>
+              <div className="text-xs text-text-3">{p.contact}</div>
             </div>
           </li>
         ))}
@@ -314,19 +314,19 @@ function OfferCard({ deal }) {
   return (
     <Section title="Selected offer & quote">
       <div className="text-sm">
-        <div className="font-medium text-slate-800">{o.selected}</div>
-        <div className="text-xs text-slate-500">
+        <div className="font-medium text-text-1">{o.selected}</div>
+        <div className="text-xs text-text-3">
           Quote <b>{o.quoteVersion}</b> · {o.quoteDate}
         </div>
         <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">
-          <dt className="text-slate-500">Committed (USD/hr)</dt>
-          <dd className="text-right font-semibold text-slate-800">{o.committedPerAccelHr.toFixed(2)}</dd>
-          <dt className="text-slate-500">On-demand (USD/hr)</dt>
-          <dd className="text-right text-slate-800">{o.onDemandPerAccelHr.toFixed(2)}</dd>
-          <dt className="text-slate-500">Accelerators</dt>
-          <dd className="text-right text-slate-800">{o.count}× H200</dd>
-          <dt className="text-slate-500">Term</dt>
-          <dd className="text-right text-slate-800">{o.termMonths} months</dd>
+          <dt className="text-text-3">Committed (USD/hr)</dt>
+          <dd className="sg-num text-right font-semibold text-text-1">{o.committedPerAccelHr.toFixed(2)}</dd>
+          <dt className="text-text-3">On-demand (USD/hr)</dt>
+          <dd className="sg-num text-right text-text-1">{o.onDemandPerAccelHr.toFixed(2)}</dd>
+          <dt className="text-text-3">Accelerators</dt>
+          <dd className="text-right text-text-1">{o.count}× H200</dd>
+          <dt className="text-text-3">Term</dt>
+          <dd className="text-right text-text-1">{o.termMonths} months</dd>
         </dl>
       </div>
     </Section>
@@ -336,12 +336,12 @@ function OfferCard({ deal }) {
 function NegotiationCard({ deal }) {
   return (
     <Section title="Negotiation state">
-      <p className="text-sm text-slate-700">{deal.negotiation.state}</p>
+      <p className="text-sm text-text-2">{deal.negotiation.state}</p>
       {deal.negotiation.approvedDeviations.map((d) => (
-        <div key={d.id} className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-2.5 text-xs">
-          <div className="font-semibold text-slate-800">{d.item}</div>
-          <p className="text-slate-600">{d.detail}</p>
-          <p className="mt-1 text-slate-400">
+        <div key={d.id} className="mt-3 rounded-md border border-[color:var(--sg-border)] bg-elevated p-2.5 text-xs">
+          <div className="font-semibold text-text-1">{d.item}</div>
+          <p className="text-text-2">{d.detail}</p>
+          <p className="mt-1 text-text-4">
             Approved deviation · {d.approver} · {d.approvedAt}
           </p>
         </div>
@@ -354,21 +354,21 @@ function PaymentCard({ deal }) {
   return (
     <Section
       title="Deposit & invoices (status only)"
-      right={<span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500">no custody</span>}
+      right={<span className="rounded bg-elevated px-1.5 py-0.5 text-[10px] text-text-3">no custody</span>}
     >
-      <div className="flex items-center justify-between rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
-        <span className="text-slate-600">Deposit</span>
-        <span className="font-semibold capitalize text-slate-800">{deal.deposit.status.replace('_', ' ')}</span>
+      <div className="flex items-center justify-between rounded-md border border-[color:var(--sg-border)] bg-elevated px-3 py-2 text-sm">
+        <span className="text-text-2">Deposit</span>
+        <span className="font-semibold capitalize text-text-1">{deal.deposit.status.replace('_', ' ')}</span>
       </div>
-      <p className="mt-2 text-xs text-slate-500">{deal.deposit.note}</p>
+      <p className="mt-2 text-xs text-text-3">{deal.deposit.note}</p>
       <ul className="mt-3 space-y-2">
         {deal.invoices.map((inv) => (
-          <li key={inv.id} className="flex items-center justify-between rounded-md border border-slate-200 px-3 py-2 text-sm">
+          <li key={inv.id} className="flex items-center justify-between rounded-md border border-[color:var(--sg-border)] px-3 py-2 text-sm">
             <div>
-              <div className="text-slate-700">{inv.label}</div>
-              <div className="text-xs text-slate-400">{inv.note}</div>
+              <div className="text-text-2">{inv.label}</div>
+              <div className="text-xs text-text-4">{inv.note}</div>
             </div>
-            <span className="ml-2 shrink-0 rounded bg-amber-100 px-2 py-0.5 text-xs font-semibold capitalize text-amber-800">
+            <span className="ml-2 shrink-0 rounded bg-[color:var(--sg-warning-dim)] px-2 py-0.5 text-xs font-semibold capitalize text-warning">
               {inv.status}
             </span>
           </li>
@@ -382,7 +382,7 @@ function MessageThread({ deal }) {
   return (
     <Section
       title="Message thread"
-      right={<span className="text-[10px] text-slate-400">structured · buyer / seller / operator</span>}
+      right={<span className="text-[10px] text-text-4">structured · buyer / seller / operator</span>}
     >
       <div className="space-y-3">
         {deal.messages.map((m) => {
@@ -391,9 +391,9 @@ function MessageThread({ deal }) {
             <div key={m.id} className={`max-w-[92%] rounded-lg border px-3 py-2 ${s.bg} ${s.border} ${s.align}`}>
               <div className="flex items-center justify-between gap-2">
                 <span className={`text-xs font-semibold capitalize ${s.name}`}>{m.from}</span>
-                <span className="text-[10px] text-slate-400">{fmtDate(m.at)}</span>
+                <span className="text-[10px] text-text-4">{fmtDate(m.at)}</span>
               </div>
-              <p className="mt-0.5 text-sm text-slate-800">{m.text}</p>
+              <p className="mt-0.5 text-sm text-text-1">{m.text}</p>
             </div>
           )
         })}
@@ -405,17 +405,17 @@ function MessageThread({ deal }) {
 function DocumentsCard({ deal }) {
   const received = deal.documents.filter((d) => d.received).length
   return (
-    <Section title="Documents checklist" right={<span className="text-[10px] text-slate-400">{received}/{deal.documents.length} received</span>}>
+    <Section title="Documents checklist" right={<span className="text-[10px] text-text-4">{received}/{deal.documents.length} received</span>}>
       <ul className="space-y-1.5">
         {deal.documents.map((d) => (
           <li key={d.id} className="flex items-start justify-between gap-2 text-sm">
             <div className="min-w-0">
-              <div className="truncate text-slate-700">{d.name}</div>
-              {!d.received && d.note && <div className="text-xs text-slate-400">{d.note}</div>}
+              <div className="truncate text-text-2">{d.name}</div>
+              {!d.received && d.note && <div className="text-xs text-text-4">{d.note}</div>}
             </div>
             <span
               className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold ${
-                d.received ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                d.received ? 'bg-[color:var(--sg-success-dim)] text-success' : 'bg-[color:var(--sg-warning-dim)] text-warning'
               }`}
             >
               {d.received ? 'received' : 'requested'}
@@ -435,16 +435,16 @@ function TasksCard({ deal }) {
           <li key={t.id} className="flex items-start gap-2 text-sm">
             <span
               className={`mt-1 inline-block h-2 w-2 shrink-0 rounded-full ${
-                t.status === 'done' ? 'bg-emerald-500' : t.status === 'open' ? 'bg-amber-500' : 'bg-slate-300'
+                t.status === 'done' ? 'bg-[color:var(--sg-success)]' : t.status === 'open' ? 'bg-[color:var(--sg-warning)]' : 'bg-elevated'
               }`}
             />
             <div className="min-w-0 flex-1">
-              <div className="text-slate-700">{t.label}</div>
-              <div className="text-xs text-slate-400">
+              <div className="text-text-2">{t.label}</div>
+              <div className="text-xs text-text-4">
                 Owner: {t.owner} · due {t.due}
               </div>
             </div>
-            <span className="shrink-0 text-xs capitalize text-slate-500">{t.status}</span>
+            <span className="shrink-0 text-xs capitalize text-text-3">{t.status}</span>
           </li>
         ))}
       </ul>
@@ -457,17 +457,17 @@ function EligibilityCard({ deal }) {
   return (
     <Section
       title="Eligibility conditions"
-      right={<span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">conditional</span>}
+      right={<span className="rounded bg-[color:var(--sg-warning-dim)] px-1.5 py-0.5 text-[10px] font-semibold text-warning">conditional</span>}
     >
-      <p className="mb-2 text-xs text-slate-500">
+      <p className="mb-2 text-xs text-text-3">
         {met}/{deal.eligibility.conditions.length} conditions met. Pre-screening only — not legal advice (SPEC §10.1).
       </p>
       <ul className="space-y-1.5">
         {deal.eligibility.conditions.map((c) => (
           <li key={c.id} className="flex items-start gap-2 text-sm">
-            <span className={`mt-0.5 h-2 w-2 shrink-0 rounded-full ${c.met ? 'bg-emerald-500' : 'bg-rose-500'}`} />
-            <span className="text-slate-700">{c.label}</span>
-            {c.pending && <span className="ml-auto shrink-0 rounded bg-rose-100 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700">open</span>}
+            <span className={`mt-0.5 h-2 w-2 shrink-0 rounded-full ${c.met ? 'bg-[color:var(--sg-success)]' : 'bg-[color:var(--sg-danger)]'}`} />
+            <span className="text-text-2">{c.label}</span>
+            {c.pending && <span className="ml-auto shrink-0 rounded bg-[color:var(--sg-danger-dim)] px-1.5 py-0.5 text-[10px] font-semibold text-danger">open</span>}
           </li>
         ))}
       </ul>
@@ -554,13 +554,13 @@ function OperatorDealControls({ deal, liveFalcon, liveDeals, apiStatus }) {
   }
 
   return (
-    <section className="mt-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm" data-testid="operator-deal-controls">
+    <section className="sg-card mt-6 p-5" data-testid="operator-deal-controls">
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Deal status — operator</h2>
-        <span className="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">operator only</span>
-        <span className="ml-auto rounded bg-sky-100 px-2 py-0.5 text-xs font-semibold text-sky-800">Current: {currentLabel}</span>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-text-3">Deal status — operator</h2>
+        <span className="rounded bg-elevated px-2 py-0.5 text-[10px] font-semibold text-text-3">operator only</span>
+        <span className="ml-auto rounded bg-[color:var(--sg-accent-dim)] px-2 py-0.5 text-xs font-semibold text-accent">Current: {currentLabel}</span>
       </div>
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-text-3">
         Signed in as <b>{operatorLabel(user)}</b>. Advance the deal only to a valid next stage (SPEC §12); every change is
         recorded in the audit trail below.
       </p>
@@ -573,7 +573,7 @@ function OperatorDealControls({ deal, liveFalcon, liveDeals, apiStatus }) {
               type="button"
               onClick={() => onAdvance(s)}
               disabled={busy}
-              className="rounded-md bg-sky-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
+              className="sg-btn sg-btn--primary px-3 py-1.5"
             >
               {busy ? '…' : `→ ${DEAL_STATUS_LABELS[s]}`}
             </button>
@@ -583,29 +583,29 @@ function OperatorDealControls({ deal, liveFalcon, liveDeals, apiStatus }) {
               type="button"
               onClick={() => onAdvance('cancelled')}
               disabled={busy}
-              className="rounded-md border border-rose-300 bg-white px-3 py-1.5 text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+              className="border border-[color:var(--sg-danger)] bg-elevated px-3 py-1.5 font-semibold text-danger disabled:opacity-50"
             >
               Cancel deal
             </button>
           )}
         </div>
       ) : (
-        <p className="mt-3 text-xs text-slate-500">Deal is {currentLabel} (terminal) — no further transition is valid.</p>
+        <p className="mt-3 text-xs text-text-3">Deal is {currentLabel} (terminal) — no further transition is valid.</p>
       )}
 
-      {err && <p className="mt-3 rounded border border-rose-300 bg-rose-50 px-2 py-1 text-xs font-medium text-rose-700">{err}</p>}
-      {okMsg && <p className="mt-3 rounded border border-emerald-300 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-800">{okMsg}</p>}
+      {err && <p className="mt-3 rounded border border-[color:var(--sg-danger)] bg-[color:var(--sg-danger-dim)] px-2 py-1 text-xs font-medium text-danger">{err}</p>}
+      {okMsg && <p className="mt-3 rounded border border-[color:var(--sg-success)] bg-[color:var(--sg-success-dim)] px-2 py-1 text-xs font-medium text-success">{okMsg}</p>}
 
-      <div className="mt-4 border-t border-slate-100 pt-3">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Audit trail</h3>
+      <div className="mt-4 border-t border-[color:var(--sg-border)] pt-3">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-text-3">Audit trail</h3>
         <ul className="mt-2 space-y-1.5">
-          {events.length === 0 && <li className="text-xs text-slate-400">No recorded events yet.</li>}
+          {events.length === 0 && <li className="text-xs text-text-4">No recorded events yet.</li>}
           {events.map((e) => (
-            <li key={e.id} className="flex items-baseline justify-between gap-2 text-xs text-slate-600">
+            <li key={e.id} className="flex items-baseline justify-between gap-2 text-xs text-text-2">
               <span>
-                <b className="text-slate-800">{e.actor}</b> — {e.text}
+                <b className="text-text-1">{e.actor}</b> — {e.text}
               </span>
-              <span className="shrink-0 text-slate-400">{decisionStamp(e.at)}</span>
+              <span className="shrink-0 text-text-4">{decisionStamp(e.at)}</span>
             </li>
           ))}
         </ul>
@@ -613,4 +613,3 @@ function OperatorDealControls({ deal, liveFalcon, liveDeals, apiStatus }) {
     </section>
   )
 }
-

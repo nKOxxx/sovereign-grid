@@ -3,11 +3,12 @@ import { useMemo, useState } from 'react'
 import { marketObservations } from '../data/seed.js'
 import { groupMarket, acceleratorFamily, MARKET_LEVELS } from '../lib/deal.js'
 import { DemoBadge } from './ui.jsx'
+import Select from '../components/Select.jsx'
 
 const LEVEL_META = {
-  Indicative: { desc: 'Public / advertised pricing. Illustrative, not transacted.', chip: 'bg-sky-100 text-sky-700' },
-  Quoted: { desc: 'Seller offers on Sovereign Grid with stated validity.', chip: 'bg-amber-100 text-amber-700' },
-  Transacted: { desc: 'Executed deals — anonymized & aggregated to protect parties.', chip: 'bg-emerald-100 text-emerald-700' },
+  Indicative: { desc: 'Public / advertised pricing. Illustrative, not transacted.', chip: 'bg-[color:var(--sg-accent-dim)] text-accent' },
+  Quoted: { desc: 'Seller offers on Sovereign Grid with stated validity.', chip: 'bg-[color:var(--sg-warning-dim)] text-warning' },
+  Transacted: { desc: 'Executed deals — anonymized & aggregated to protect parties.', chip: 'bg-[color:var(--sg-success-dim)] text-success' },
 }
 
 export default function MarketIntel() {
@@ -32,12 +33,12 @@ export default function MarketIntel() {
     <div className="mx-auto max-w-6xl px-4 py-6">
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <DemoBadge />
-        <span className="text-xs text-slate-500">Benchmark view — every figure DEMO / illustrative, never a live market price.</span>
+        <span className="text-xs text-text-3">Benchmark view — every figure DEMO / illustrative, never a live market price.</span>
       </div>
-      <h1 className="text-2xl font-bold text-slate-900">Market Intelligence</h1>
+      <h1 className="sg-display text-2xl">Market Intelligence</h1>
 
       {/* Publication control banner (SPEC §14.3) */}
-      <div className="mt-3 rounded-lg border border-indigo-300 bg-indigo-50 px-4 py-3 text-sm text-indigo-900">
+      <div className="mt-3 rounded-lg border border-[color:var(--sg-accent)] bg-[color:var(--sg-accent-dim)] px-4 py-3 text-sm text-accent">
         <span className="font-semibold">Indicative analytics — not a Sovereign Grid index.</span>{' '}
         A live index requires documented inclusion rules, quality filters, observation minimums, outlier policy, conflict
         controls, revision policy and independent governance. Until those exist, outputs are labelled indicative (SPEC
@@ -52,23 +53,16 @@ export default function MarketIntel() {
       </div>
 
       {/* Price series by accelerator family */}
-      <section className="mt-8 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      <section className="sg-card mt-8 p-5">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Price series by accelerator family</h2>
-          <label className="flex items-center gap-1 text-xs text-slate-600">
-            Source level:
-            <select value={levelFilter} onChange={(e) => setLevelFilter(e.target.value)} className="rounded-md border border-slate-300 bg-white px-2 py-1 text-sm">
-              {['All', ...MARKET_LEVELS].map((l) => (
-                <option key={l}>{l}</option>
-              ))}
-            </select>
-          </label>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-text-3">Price series by accelerator family</h2>
+          <Select value={levelFilter} onChange={setLevelFilter} options={['All', ...MARKET_LEVELS]} label="Source level" />
         </div>
-        <p className="mb-3 text-xs text-slate-500">Observations by accelerator family (H200, MI300X, TPU, Ascend 910C) with region, term, timestamp and source level.</p>
+        <p className="mb-3 text-xs text-text-3">Observations by accelerator family (H200, MI300X, TPU, Ascend 910C) with region, term, timestamp and source level.</p>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[720px] border-collapse text-sm">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+              <tr className="border-b border-[color:var(--sg-border)] bg-elevated text-left text-xs uppercase tracking-wide text-text-3">
                 <th className="px-3 py-2">Family</th>
                 <th className="px-3 py-2">Level</th>
                 <th className="px-3 py-2">Region</th>
@@ -80,21 +74,21 @@ export default function MarketIntel() {
             </thead>
             <tbody>
               {priceRows.map((o) => (
-                <tr key={o.id} className="border-b border-slate-100">
-                  <td className="px-3 py-2 font-medium text-slate-800">{o.family}</td>
+                <tr key={o.id} className="border-b border-[color:var(--sg-border)]">
+                  <td className="px-3 py-2 font-medium text-text-1">{o.family}</td>
                   <td className="px-3 py-2">
                     <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${LEVEL_META[o.level].chip}`}>{o.level}</span>
                   </td>
-                  <td className="px-3 py-2 text-slate-700">{o.region}</td>
-                  <td className="px-3 py-2 text-slate-700">{o.term}</td>
-                  <td className="px-3 py-2 font-semibold text-slate-900">{o.pricePerAccelHr.toFixed(2)}</td>
-                  <td className="px-3 py-2 text-slate-600">{o.date}</td>
-                  <td className="px-3 py-2 text-xs text-slate-500">{o.source}</td>
+                  <td className="px-3 py-2 text-text-2">{o.region}</td>
+                  <td className="px-3 py-2 text-text-2">{o.term}</td>
+                  <td className="sg-num px-3 py-2 font-semibold text-text-1">{o.pricePerAccelHr.toFixed(2)}</td>
+                  <td className="px-3 py-2 text-text-2">{o.date}</td>
+                  <td className="px-3 py-2 text-xs text-text-3">{o.source}</td>
                 </tr>
               ))}
               {priceRows.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-3 py-4 text-center text-slate-500">No observations at this level.</td>
+                  <td colSpan={7} className="px-3 py-4 text-center text-text-3">No observations at this level.</td>
                 </tr>
               )}
             </tbody>
@@ -105,44 +99,44 @@ export default function MarketIntel() {
       {/* Forward scenario (indicative) */}
       <ForwardScenario />
 
-      <p className="mt-4 text-xs text-slate-400">Demo — illustrative analytics. Published analytics are aggregated and reviewed for confidentiality (SPEC §15.2).</p>
+      <p className="mt-4 text-xs text-text-4">Demo — illustrative analytics. Published analytics are aggregated and reviewed for confidentiality (SPEC §15.2).</p>
     </div>
   )
 }
 
 function LevelPanel({ level, meta, cells, hidden }) {
   return (
-    <section className={`rounded-lg border p-4 shadow-sm ${level === 'Indicative' ? 'border-sky-200 bg-sky-50/40' : level === 'Quoted' ? 'border-amber-200 bg-amber-50/40' : 'border-emerald-200 bg-emerald-50/40'}`}>
+    <section className={`rounded-lg border p-4 ${level === 'Indicative' ? 'border-[color:var(--sg-accent)] bg-[color:var(--sg-accent-dim)]' : level === 'Quoted' ? 'border-[color:var(--sg-warning)] bg-[color:var(--sg-warning-dim)]' : 'border-[color:var(--sg-success)] bg-[color:var(--sg-success-dim)]'}`}>
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-bold text-slate-800">{level}</h3>
+        <h3 className="text-sm font-bold text-text-1">{level}</h3>
         <span className={`rounded px-2 py-0.5 text-[10px] font-semibold uppercase ${meta.chip}`}>{level === 'Indicative' ? 'public' : level === 'Quoted' ? 'quoted' : 'transacted'}</span>
       </div>
-      <p className="mt-1 text-xs text-slate-600">{meta.desc}{hidden.length > 0 && <span className="font-medium text-slate-500"> — {hidden.length} cell{hidden.length > 1 ? 's' : ''} withheld below the 3-observation minimum</span>}</p>
+      <p className="mt-1 text-xs text-text-2">{meta.desc}{hidden.length > 0 && <span className="font-medium text-text-3"> — {hidden.length} cell{hidden.length > 1 ? 's' : ''} withheld below the 3-observation minimum</span>}</p>
 
-      {cells.length === 0 && hidden.length === 0 && <p className="mt-3 text-xs text-slate-400">No observations at this level.</p>}
+      {cells.length === 0 && hidden.length === 0 && <p className="mt-3 text-xs text-text-4">No observations at this level.</p>}
 
       <ul className="mt-3 space-y-2">
         {cells.map((c) => (
-          <li key={c.key} className="rounded-md border border-white bg-white p-2.5 shadow-sm">
+          <li key={c.key} className="rounded-md border border-[color:var(--sg-border)] bg-card p-2.5">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-semibold text-slate-800">{c.family || c.key}</span>
-              <span className="text-[10px] text-slate-400">{c.region}</span>
+              <span className="text-sm font-semibold text-text-1">{c.family || c.key}</span>
+              <span className="text-[10px] text-text-4">{c.region}</span>
             </div>
             <div className="mt-1 flex items-end justify-between">
-              <span className="text-lg font-bold text-slate-900">${c.avg.toFixed(2)}<span className="text-xs font-normal text-slate-400">/accel-hr</span></span>
-              <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">{c.count} obs</span>
+              <span className="sg-num text-lg font-bold text-text-1">${c.avg.toFixed(2)}<span className="text-xs font-normal text-text-4">/accel-hr</span></span>
+              <span className="rounded bg-[color:var(--sg-success-dim)] px-1.5 py-0.5 text-[10px] font-semibold text-success">{c.count} obs</span>
             </div>
-            <div className="mt-1 text-[11px] text-slate-400">min ${c.min.toFixed(2)} · max ${c.max.toFixed(2)} · latest {c.latest}</div>
+            <div className="mt-1 text-[11px] text-text-4">min <span className="sg-num">${c.min.toFixed(2)}</span> · max <span className="sg-num">${c.max.toFixed(2)}</span> · latest {c.latest}</div>
           </li>
         ))}
 
         {hidden.map((c) => (
-          <li key={c.key} className="rounded-md border border-dashed border-slate-300 bg-white/50 p-2.5">
+          <li key={c.key} className="rounded-md border border-dashed border-[color:var(--sg-border)] bg-elevated p-2.5">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-500">{c.family || c.key}</span>
-              <span className="text-[10px] text-slate-400">{c.region}</span>
+              <span className="text-sm text-text-3">{c.family || c.key}</span>
+              <span className="text-[10px] text-text-4">{c.region}</span>
             </div>
-            <div className="mt-1 text-xs italic text-slate-500">insufficient observations ({c.count} &lt; 3)</div>
+            <div className="mt-1 text-xs italic text-text-3">insufficient observations ({c.count} &lt; 3)</div>
           </li>
         ))}
       </ul>
@@ -158,19 +152,19 @@ function ForwardScenario() {
     { id: 'sc-4', family: 'Ascend 910C', region: 'China', term: 'committed 24mo', indicative: 1.65, forward: 1.7, note: 'assumes demand uplift' },
   ]
   return (
-    <section className="mt-8 rounded-lg border border-indigo-200 bg-indigo-50/40 p-5 shadow-sm">
+    <section className="mt-8 rounded-lg border border-[color:var(--sg-accent)] bg-[color:var(--sg-accent-dim)] p-5">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Forward scenario</h2>
-        <span className="rounded bg-indigo-100 px-2 py-0.5 text-[10px] font-bold uppercase text-indigo-700">scenario — indicative</span>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-text-3">Forward scenario</h2>
+        <span className="rounded bg-[color:var(--sg-accent-dim)] px-2 py-0.5 text-[10px] font-bold uppercase text-accent">scenario — indicative</span>
       </div>
-      <p className="mb-3 mt-1 text-xs text-slate-500">
+      <p className="mb-3 mt-1 text-xs text-text-3">
         Illustrative forward expectations derived from the indicative-level observations above. These are NOT quotes and
         NOT a listed derivative (SPEC §14.4). Sovereign Grid does not operate a regulated futures market in the MVP.
       </p>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[640px] border-collapse text-sm">
           <thead>
-            <tr className="border-b border-indigo-200 text-left text-xs uppercase tracking-wide text-slate-500">
+            <tr className="border-b border-[color:var(--sg-border)] text-left text-xs uppercase tracking-wide text-text-3">
               <th className="px-3 py-2">Family</th>
               <th className="px-3 py-2">Region</th>
               <th className="px-3 py-2">Term</th>
@@ -181,13 +175,13 @@ function ForwardScenario() {
           </thead>
           <tbody>
             {scenarios.map((s) => (
-              <tr key={s.id} className="border-b border-indigo-100">
-                <td className="px-3 py-2 font-medium text-slate-800">{s.family}</td>
-                <td className="px-3 py-2 text-slate-700">{s.region}</td>
-                <td className="px-3 py-2 text-slate-700">{s.term}</td>
-                <td className="px-3 py-2 text-slate-700">${s.indicative.toFixed(2)}</td>
-                <td className="px-3 py-2 font-semibold text-indigo-800">${s.forward.toFixed(2)}</td>
-                <td className="px-3 py-2 text-xs text-slate-500">{s.note}</td>
+              <tr key={s.id} className="border-b border-[color:var(--sg-border)]">
+                <td className="px-3 py-2 font-medium text-text-1">{s.family}</td>
+                <td className="px-3 py-2 text-text-2">{s.region}</td>
+                <td className="px-3 py-2 text-text-2">{s.term}</td>
+                <td className="sg-num px-3 py-2 text-text-1">${s.indicative.toFixed(2)}</td>
+                <td className="sg-num px-3 py-2 font-semibold text-accent">${s.forward.toFixed(2)}</td>
+                <td className="px-3 py-2 text-xs text-text-3">{s.note}</td>
               </tr>
             ))}
           </tbody>

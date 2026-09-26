@@ -28,9 +28,9 @@ export default function App() {
   return (
     <MarketProvider>
       <BrowserRouter basename={import.meta.env.BASE_URL}>
-        <div className='min-h-screen bg-slate-50'>
-          <nav className='flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-slate-200 bg-white px-6 py-3'>
-            <span className='mr-1 font-bold text-slate-900'>Sovereign Grid</span>
+        <div className='min-h-screen bg-canvas'>
+          <nav className='flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-[color:var(--sg-border)] bg-surface px-6 py-3'>
+            <span className='mr-1 font-bold text-text-1'>Sovereign Grid</span>
             <DemoBadge label='DEMO — illustrative data only' />
             <NavLink to='/' className={navCls} end>
               Marketplace
@@ -78,11 +78,11 @@ export default function App() {
             <span className='ml-auto flex items-center gap-2'>
               {user ? (
                 <span className='flex items-center gap-2 text-sm'>
-                  <span className='text-xs text-slate-500'>{user.email || user.role}</span>
+                  <span className='text-xs text-text-3'>{user.email || user.role}</span>
                   <button
                     type='button'
                     onClick={handleLogout}
-                    className='rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50'
+                    className='rounded-md border border-[color:var(--sg-border)] bg-elevated px-2 py-1 text-xs font-medium text-text-2 hover:bg-[color:var(--sg-border)]'
                   >
                     Log out
                   </button>
@@ -117,5 +117,5 @@ export default function App() {
 }
 
 function navCls({ isActive }) {
-  return 'text-sm ' + (isActive ? 'font-semibold text-sky-700' : 'text-slate-600 hover:text-slate-900')
+  return 'text-sm ' + (isActive ? 'font-semibold text-accent' : 'text-text-2 hover:text-text-1')
 }
