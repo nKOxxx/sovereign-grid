@@ -15,7 +15,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMarket } from '../store/MarketContext.jsx'
 import { api } from '../lib/api.js'
-import { getToken } from '../lib/auth.js'
+import { getToken, getCurrentUser } from '../lib/auth.js'
 import { goldenRequest } from '../data/seed.js'
 import { buildUnifiedMatchesFromSeed, requestToPayload } from '../lib/apiMappers.js'
 import { DemoBadge, OfflineBadge } from './ui.jsx'
@@ -51,6 +51,11 @@ async function resolveFalconMatches(token) {
 export default function MatchResults() {
   const { listings } = useMarket()
   const [expanded, setExpanded] = useState(null)
+
+  // The Accept offer action is buyer-only; other roles / anonymous visitors
+  // keep the read-only match results (existing Deal Room link).
+  const currentUser = getCurrentUser()
+  const isBuyer = Boolean(currentUser && currentUser.role === 'buyer')
 
   const seed = useMemo(
     () => buildUnifiedMatchesFromSeed(listings, goldenRequest),
@@ -126,7 +131,7 @@ export default function MatchResults() {
             </p>
           )}
           {bookable.map((m) => (
-            <MatchCard key={m.listingId} m={m} best={m.listingId === bestId} />
+            <MatchCard key={m.listingId} m={m} best={m.listingId === bestId} isBuyer={isBuyer} />
           ))}
         </div>
 
@@ -156,12 +161,32 @@ export default function MatchResults() {
   )
 }
 
-function MatchCard({ m, best }) {
+function shortDealId(id) {
+  return id && id.length > 8 ? id.slice(0, 8) : id || ''
+}
+
+function MatchCard({ m, best, isBuyer }) {
   const comp = m.componentScores || {}
   const rank = typeof m.rank === 'number' ? `#${m.rank}` : ''
   const committed = typeof m.committedPerAccelHr === 'number' ? `$${m.committedPerAccelHr.toFixed(2)}` : '—'
   const effective = typeof m.effectivePerAccelHr === 'number' ? `$${m.effectivePerAccelHr.toFixed(2)}` : '—'
   const tcv = typeof m.totalContractValue === 'number' ? `$${m.totalContractValue.toLocaleString()}` : '—'
+
+  // Inline offer-acceptance: POST /api/deals/accept (buyer only, idempotent).
+  const [accept, setAccept] = useState(null) // null | {status:'loading'} | {status:'done', deal} | {status:'error', code}
+
+  async function onAccept() {
+    setAccept({ status: 'loading' })
+    try {
+      const token = getToken()
+      const { deal } = await api.post('/deals/accept', { listingId: m.listingId }, { token })
+      setAccept({ status: 'done', deal })
+    } catch (err) {
+      setAccept({ status: 'error', code: err && err.code })
+    }
+  }
+
+  const accepting = accept && accept.status === 'loading'
 
   return (
     <article className={`sg-card flex flex-col p-5 ${best ? 'sg-beam sg-card--best' : ''}`}>
@@ -192,9 +217,27 @@ function MatchCard({ m, best }) {
 
       <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-white/10 pt-3">
         <span className="text-xs text-text-4">TCV {tcv}</span>
-        <Link to="/dealroom" className="sg-btn sg-btn--primary text-xs">
-          Request connection → Deal Room
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          {accept && accept.status === 'done' ? (
+            <span className="sg-pill sg-pill--success">
+              Accepted — deal <span className="sg-num">{shortDealId(accept.deal.id)}</span> ·{' '}
+              <span className="sg-num">{accept.deal.status}</span>
+            </span>
+          ) : accept && accept.status === 'error' ? (
+            <span className="text-xs text-danger">
+              {accept.code === 'conflict' ? 'No longer available' : 'Could not accept offer'}
+            </span>
+          ) : (
+            isBuyer && (
+              <button type="button" className="sg-btn sg-btn--primary text-xs" disabled={accepting} onClick={onAccept}>
+                {accepting ? 'Accepting…' : 'Accept offer'}
+              </button>
+            )
+          )}
+          <Link to="/dealroom" className="sg-btn sg-btn--primary text-xs">
+            Request connection → Deal Room
+          </Link>
+        </div>
       </div>
     </article>
   )

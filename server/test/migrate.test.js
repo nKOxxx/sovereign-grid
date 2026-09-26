@@ -37,7 +37,7 @@ describe('migrate', () => {
       const { rows } = await c.query('SELECT filename FROM schema_migrations')
       expect(rows.map((r) => r.filename)).toEqual([
         '0001_init.sql', '0002_auth.sql', '0003_wave_c.sql',
-        '0004_wave_c_fix.sql', '0005_listing_review.sql',
+        '0004_wave_c_fix.sql', '0005_listing_review.sql', '0006_deal_accept.sql',
       ])
     } finally {
       await c.end()

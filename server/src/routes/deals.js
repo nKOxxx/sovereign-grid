@@ -2,6 +2,9 @@
 // /api/deals — deal lifecycle, approvals, and the deal-room message thread.
 //
 //   POST /api/deals                operator only — create deal + parties
+//   POST /api/deals/accept         buyer only — accept an ACTIVE listing and
+//                                  open a deal themselves (idempotent, audited
+//                                  by no INSERT trigger — see 0006)
 //   GET  /api/deals                operator all; buyer/seller only deals they're
 //                                  a party to (RLS deal_parties join enforces it)
 //   GET  /api/deals/:id            party or operator, else 404
@@ -31,6 +34,11 @@ const createDealSchema = z.object({
   buyerId: z.string().uuid('valid buyerId required'),
   sellerId: z.string().uuid('valid sellerId required'),
   offerId: z.string().uuid().optional(),
+})
+
+const acceptSchema = z.object({
+  listingId: z.string().uuid('valid listingId required'),
+  requestId: z.string().uuid().optional(),
 })
 
 const statusSchema = z.object({
@@ -71,6 +79,41 @@ export function createDealsRouter({ pool }) {
         return d.rows[0]
       }, pool)
       res.status(201).json({ deal })
+    } catch (err) {
+      next(err)
+    }
+  })
+
+  // ---- buyer accept (buyer only) -------------------------------------------
+  // Buyers accept an ACTIVE listing themselves and open a deal (previously
+  // operator-created only). offer_accept() (0006) is SECURITY DEFINER / owner-run
+  // because a buyer cannot read the RLS-closed listings table (seller_id) or
+  // write deals/deal_parties under default-deny RLS — the same precedent as
+  // match_listings_for_match(). withUser supplies the buyer audit context. No
+  // audit trigger fires on deal INSERT (0001 audits status UPDATEs + approvals
+  // only) — noted rather than adding a migration.
+  router.post('/accept', requireRole('buyer'), async (req, res, next) => {
+    try {
+      const body = acceptSchema.parse(req.body)
+      const { rows } = await withUser(req.user.id, 'buyer', async (c) => {
+        return c.query('SELECT outcome, deal FROM offer_accept($1, $2, $3)', [
+          req.user.id,
+          body.listingId,
+          body.requestId ?? null,
+        ])
+      }, pool)
+      const { outcome, deal } = rows[0]
+      if (outcome === 'not_found') {
+        res.status(404).json({ error: { code: 'not_found', message: 'Not found' } })
+        return
+      }
+      if (outcome === 'conflict') {
+        res.status(409).json({ error: { code: 'conflict', message: 'Listing no longer available' } })
+        return
+      }
+      // 'existing' -> idempotent replay returns the already-open deal with 200;
+      // 'created' -> 201.
+      res.status(outcome === 'existing' ? 200 : 201).json({ deal })
     } catch (err) {
       next(err)
     }
