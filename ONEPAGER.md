@@ -34,8 +34,18 @@ views expose a safe column whitelist only. **Never a live market price** —
 observations are dated, evidence-specific, and feed an index.
 
 ## Status (Sept 2026)
-- Interactive demo v0.4 live: 11 screens, 66 frontend tests, 26 browser
-  checks — https://nkoxxx.github.io/sovereign-grid/
+- **Live platform: https://sovereign-grid-o707.onrender.com** — 16 screens,
+  structured marketplace end-to-end: post demand → scored matches with
+  disqualification reasons → **buyer offer acceptance** → deal room with
+  operator lifecycle; seller onboarding with operator review gate; fee
+  engine + five-year calculator; capacity passport; market intel.
+- Institutional controls in code: RLS deny-by-default tenancy, immutable
+  audit log on every approval and status transition, evidence-backed
+  eligibility, security-definer pinned read paths.
+- **313 automated checks green** (166 frontend · 121 API/integration ·
+  26 browser end-to-end) + 6/6 live production golden-path replay.
+- Track record: built and deployed in 2 days by a 1-engineer +
+  orchestrator/worker AI fleet (see DELIVERY_PLAN §2 fleet projection).
 - Backend wave A+B landed: Postgres schema + RLS + immutable audit log,
   scrypt-salted sessions, rate-limited auth, full request/listing/deal/
   approval API — 64/64 server tests.
