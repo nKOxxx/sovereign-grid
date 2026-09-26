@@ -83,3 +83,9 @@ Fixes the G2 miss: Fee Engine shipped on default light styling inside the dark a
 - UI: Accept offer on MatchResults (buyer-only), inline deal confirmation, sg-num ids.
 - Floors: 173/173 root (+7), 130/130 server (+9), build ✓. Deployed b28051c live; golden 6/6 + e2e 26/26 vs prod; route 401-gated on prod; button in prod bundle.
 - Marketplace loop now CLOSED end-to-end: demand → matches → acceptance → deal room.
+
+## Wave K — full-app dark reskin, FINAL (2026-09-26, worker sg-p1-waveK-001, 1 attempt)
+- Closed the real gap found by bundle audit: shell + 10 screens (DealRoom 93 light hits, Intel 45, Eligibility 50, Passport 49, CRM 42, Calc 30, Login 17, PostDemand 14, ListCapacity 19, App 6 = 424) were still light-theme under the dark reskinned trio. Wave K converted all to sg tokens.
+- Native selects eliminated everywhere (Intel). Operator dev creds removed from Login card (buyer-only + "operator invite-only" note). Placeholder.jsx deleted. design-law.test.jsx: app-wide CI guard (0 light classes, 0 native selects across src).
+- Floors: 177/177 root (+4), 130/130 server, build ✓. Deployed df28ca2 live; golden 6/6 + e2e 26/26; prod dark sweep: 5 routes bg rgb(10,10,11), 0 white elements, 0 selects, 0 console errors.
+- STATE: build-complete. Marketplace loop closed, one coherent design, partner-ready.
