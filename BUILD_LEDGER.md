@@ -65,3 +65,15 @@ Fixes the G2 miss: Fee Engine shipped on default light styling inside the dark a
 - Verified vs new prod: golden 6/6, e2e 26/26, /api/health 200 on 1bccad6.
 - rotate_render_db.sh repointed to new SID/URL; `check` green (29 days left); cron sg_watch.sh inherits.
 - Legacy zzxu left running as fallback during burn-in; pause/delete after 24-48h.
+
+## Wave H — seller onboarding (2026-09-26, worker sg-p1-waveH-001, 1 attempt)
+- /sell: register/login → create listing → POST /api/listings; nav for anon/buyer. Design law held (custom Select, no light classes, own LIGHT_SLOP guard).
+- Committed inside f0112b5 (swept by infra commit — lesson: surgical git add on concurrent worker output).
+- Floors: 159/159 root vitest, 109/109 server, build ✓; live in o707 prod bundle (verified).
+
+## Infra — successor service cutover (2026-09-26)
+- Primary https://sovereign-grid-o707.onrender.com (svc srv-darmnvrncjis73e9c8jg); zzxu = legacy fallback (pause after burn-in). SESSION_SECRET rotated. Watchdog/rotate repointed. golden 6/6 + e2e 26/26 vs new prod.
+
+## Wave I — listing review gate (2026-09-26, worker sg-p1-waveI-001, 1 attempt)
+- Integrity hole closed: POST /api/listings forces status='pending' (zod strips client status; DB DEFAULT 'pending' in 0005). PATCH /api/listings/:id/status operator-only (401/403/404 tested); GET ?status=pending operator-only queue. Transitions audited via existing audit_triggered_row trigger. Verified: matcher (0003) + marketplace view (0002) already active-only → pending structurally invisible.
+- Operator UI: /review queue (approve/reject, dark tokens). Floors after: 166/166 root vitest (+7), 121/121 server (+12), build ✓; deployed ab1c209 live; golden 6/6 + e2e 26/26 vs prod post-deploy.
