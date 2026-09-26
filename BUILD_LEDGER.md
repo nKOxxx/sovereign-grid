@@ -95,3 +95,8 @@ Fixes the G2 miss: Fee Engine shipped on default light styling inside the dark a
 - First real signals in prod: 5 vast.ai rows (H100/A100/H200, EU+US). Fix-up commit 01a844b: family taxonomy extended (0008 migration + backfill — 'H100 SXM' now 'H100'); prod re-verified families {H100:8, A100:1, H200:1}. Spot churn is real (cheap offers rotate hourly; dedupe verified correct — stable ids update, expired vanish, new insert).
 - Floors: 185/185 root, 143/143 server, build ✓; golden 6/6 + e2e 26/26 vs prod.
 - Ops: cron sg-vast-ingest every 6h (job e3d3ce8941ca). Sources runbook: docs/SOURCES.md. Next verified-but-uningested: Azure Retail Prices, AWS bulk index.
+
+## Wave M — trust bundle (2026-09-26, worker sg-p1-waveM-001, 2 attempts)
+- 0009: email_verifications + users.email_verified/token_version; register→verify gate on listings/deals (403 email_unverified), operator token hand-off (reveal once, audited), reset flow (no enumeration), per-IP rate limits, Terms/Privacy screens.
+- Hub fixes: (1) test-harness bug — final audit assertion omitted appPool in withUser (queried default DB, not scratch); (2) INFRA: 0009 DROP/CREATEs 0002-era auth fns; prod owner is the runtime identity → deploy would crash-loop. Fixed via role-membership (GRANT sg_migrate TO sovereign_grid_db_user) + ownership transfer of exactly the two replaced fns, then migrate — applied clean.
+- Floors: 195/195 root, 154/154 server, build ✓; golden 6/6 + e2e 26/26 vs prod. Commit 9bebbf6.
