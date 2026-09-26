@@ -126,10 +126,14 @@ ever wanted.
 - Free-tier note: Render free Postgres expires after 30 days on some accounts —
   add a card or upgrade before then to keep the DB.
 - Subdomains are **immutable**: `PATCH /services/{id}` renames the dashboard
-  display name only; the `-zzxu` slug stays. A clean URL (custom domain, or a
-  successor service created as `sovereign-grid`) is the only fix. Successor
-  attempted 2026-09-25 ~22:30 — blocked by Render API returning 500 on
-  `POST /v1/services` (worked 12h earlier); retry when their API recovers.
+  display name only; the creation-time slug stays. **[RESOLVED 2026-09-26]**
+  Successor service created after the Render create-API 500 outage ended:
+  primary = `sovereign-grid-o707` (https://sovereign-grid-o707.onrender.com,
+  `srv-darmnvrncjis73e9c8jg`); old svc renamed `sovereign-grid-legacy` (zzxu)
+  as fallback during burn-in — pause/delete after 24–48 h. Note: `sovereign-grid`
+  alone was unavailable (name collision with the renamed old service), forcing
+  the `-o707` suffix; only a custom domain yields a suffix-free URL. Rotate
+  script + watchdog now target the successor.
 
 ## DB expiry & rotation (free, automated)
 
