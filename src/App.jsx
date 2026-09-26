@@ -15,6 +15,8 @@ import DealRoom from './screens/DealRoom.jsx'
 import CrmAutomation from './screens/CrmAutomation.jsx'
 import MarketIntel from './screens/MarketIntel.jsx'
 import Login from './screens/Login.jsx'
+import Terms from './screens/Terms.jsx'
+import Privacy from './screens/Privacy.jsx'
 import { getCurrentUser, logout } from './lib/auth.js'
 import { DemoBadge } from './screens/ui.jsx'
 
@@ -109,6 +111,8 @@ export default function App() {
             <Route path='/crm' element={<CrmAutomation />} />
             <Route path='/intel' element={<MarketIntel />} />
             <Route path='/login' element={<Login />} />
+            <Route path='/terms' element={<Terms />} />
+            <Route path='/privacy' element={<Privacy />} />
           </Routes>
         </div>
       </BrowserRouter>

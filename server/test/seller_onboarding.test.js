@@ -11,6 +11,7 @@ import { migrate } from '../src/db/migrate.js'
 import { createPool } from '../src/db/pool.js'
 import { createApp } from '../src/app.js'
 import { createScratchDb, dropScratchDb } from './helpers/db.js'
+import { registerVerified } from './helpers/verification.js'
 
 let scratch
 let appPool
@@ -79,13 +80,19 @@ describe('seller onboarding round-trip', () => {
     const email = 'onboardseller@sg.test'
     const password = 'supersecret123'
 
-    // 1. register seller -> 201, token + user(role=seller)
-    const reg = await api('POST', '/api/auth/register', {
-      body: { email, password, role: 'seller', displayName: 'Onboard Grid' },
+    // 1. register seller -> 201, token + user(role=seller). The seller must be
+    //    email-verified before creating a listing (gated action), so register
+    //    through the helper that consumes the logged VERIFY_TOKEN.
+    const reg = await registerVerified(api, {
+      email,
+      password,
+      role: 'seller',
+      displayName: 'Onboard Grid',
     })
     expect(reg.status).toBe(201)
     expect(reg.json.user.role).toBe('seller')
     expect(reg.json.user.password_hash).toBeUndefined()
+    expect(reg.json.verificationRequired).toBe(true)
 
     // 2. login -> 200, fresh token
     const loginRes = await api('POST', '/api/auth/login', {

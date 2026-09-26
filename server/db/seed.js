@@ -232,11 +232,14 @@ export async function seed(pool = createPool()) {
   ]
 
   await withUser(U.operator, 'operator', async (c) => {
-    // users (idempotent on fixed id)
+    // users (idempotent on fixed id). Demo accounts are pre-verified: the Wave
+    // M migration (0009) also flips them via UPDATE for existing DBs, but on a
+    // fresh DB seed runs AFTER migrate, so the INSERT carries email_verified
+    // here to keep the golden/e2e demo path unblocked regardless of order.
     for (const [id, role, email, dn, ph] of users) {
       await c.query(
-        `INSERT INTO users (id, role, email, display_name, password_hash)
-         VALUES ($1,$2,$3,$4,$5) ON CONFLICT (id) DO NOTHING`,
+        `INSERT INTO users (id, role, email, display_name, password_hash, email_verified)
+         VALUES ($1,$2,$3,$4,$5,true) ON CONFLICT (id) DO NOTHING`,
         [id, role, email, dn, role === 'operator' ? null : ph], // operator dev login set separately below
       )
     }

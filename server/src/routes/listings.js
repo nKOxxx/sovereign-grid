@@ -20,6 +20,7 @@ import { Router } from 'express'
 import { z } from 'zod'
 import { requireRole } from '../middleware/roles.js'
 import { requireAuth } from '../middleware/auth.js'
+import { requireVerified } from '../middleware/verified.js'
 import { withUser } from '../db/pool.js'
 
 const listingSchema = z.object({
@@ -82,7 +83,8 @@ export function createListingsRouter({ pool }) {
   // Everything below requires authentication.
   router.use(requireAuth({ pool }))
 
-  router.post('/', requireRole('seller'), async (req, res, next) => {
+  // Creating a listing is a gated (verified-seller) action.
+  router.post('/', requireRole('seller'), requireVerified(), async (req, res, next) => {
     try {
       const body = listingSchema.parse(req.body)
       const columns = [

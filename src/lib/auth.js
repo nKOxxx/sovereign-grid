@@ -101,6 +101,15 @@ export async function register({ email, password, role, displayName }) {
 }
 
 /**
+ * Request a fresh email-verification token for an unverified account.
+ * Always resolves (the server returns 200 regardless of whether the email
+ * exists — no enumeration). UI shows a benign "sent" state on success.
+ */
+export async function resendVerification(email) {
+  await api.post('/auth/resend', { email })
+}
+
+/**
  * End the server session (best-effort) and clear local credentials.
  * Never throws — local sign-out always succeeds even if the network is down.
  */

@@ -40,6 +40,7 @@ describe('migrate', () => {
         '0004_wave_c_fix.sql', '0005_listing_review.sql', '0006_deal_accept.sql',
         '0007_market_observations.sql',
         '0008_market_families.sql',
+        '0009_auth_trust.sql',
       ])
     } finally {
       await c.end()
@@ -78,8 +79,8 @@ describe('migrate', () => {
       )
       expect(rows.map((r) => r.relname)).toEqual([
         'approvals', 'audit_log', 'deal_parties', 'deals', 'eligibility_cases',
-        'evidence_items', 'fee_policy', 'listings', 'market_observations',
-        'messages', 'offers', 'requests', 'sessions', 'users',
+        'email_verifications', 'evidence_items', 'fee_policy', 'listings',
+        'market_observations', 'messages', 'offers', 'requests', 'sessions', 'users',
       ])
     } finally {
       await c.end()

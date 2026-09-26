@@ -17,6 +17,7 @@ import { createPool, withUser } from '../src/db/pool.js'
 import { createApp } from '../src/app.js'
 import { createSession } from '../src/auth/sessions.js'
 import { createScratchDb, dropScratchDb } from './helpers/db.js'
+import { registerVerified } from './helpers/verification.js'
 
 let scratch
 let appPool
@@ -215,6 +216,7 @@ describe('requests (buyer-scoped)', () => {
   let opTokenReq
 
   beforeAll(async () => {
+    app.locals.resetAuthRateLimiters?.()
     buyerA = (await registerBuyer('reqA@sg.test')).json
     buyerB = (await registerBuyer('reqB@sg.test')).json
   })
@@ -287,8 +289,10 @@ describe('listings + public marketplace', () => {
   let seller
 
   beforeAll(async () => {
+    app.locals.resetAuthRateLimiters?.()
     buyer = (await registerBuyer('mkbuyer@sg.test')).json
-    seller = (await registerSeller('mkseller@sg.test')).json
+    // The seller must be email-verified before creating a listing (gated action).
+    seller = (await registerVerified(api, { email: 'mkseller@sg.test', role: 'seller' })).json
   })
 
   it('seller creates a listing with a committed price', async () => {
@@ -362,6 +366,7 @@ describe('deals, approvals, messages + audit', () => {
   let dealId
 
   beforeAll(async () => {
+    app.locals.resetAuthRateLimiters?.()
     ;({ token: opToken } = await createSession(ids.op, 'operator', appPool))
     buyer = (await registerBuyer('dealbuyer@sg.test')).json
     seller = (await registerSeller('dealseller@sg.test')).json

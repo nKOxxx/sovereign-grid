@@ -23,6 +23,7 @@ import { createErrorHandler } from './lib/errors.js'
 import { securityHeaders } from './middleware/security-headers.js'
 import { createCors } from './middleware/cors.js'
 import { createAuthRouter } from './routes/auth.js'
+import { createOperatorRouter } from './routes/operator.js'
 import { createRequestsRouter } from './routes/requests.js'
 import { createListingsRouter } from './routes/listings.js'
 import { createDealsRouter } from './routes/deals.js'
@@ -31,6 +32,7 @@ import { createCalculatorRouter } from './routes/calculator.js'
 import { createFeesRouter } from './routes/fees.js'
 import { createEligibilityRouter } from './routes/eligibility.js'
 import { createIntelRouter } from './routes/intel.js'
+import { createRateLimiter } from './middleware/rate-limit.js'
 
 const DEFAULT_CORS_ORIGINS = [
   'http://localhost:4173',
@@ -61,6 +63,17 @@ export function createApp({ pool = defaultPool, logger = console, fetchImpl = gl
   app.use(createCors({ origins: parseCorsOrigins() }))
   app.use(express.json({ limit: '256kb' }))
 
+  // Moderate write throttle (60/min/IP, dependency-free, in-memory) across every
+  // /api write. The auth router applies its own STRICTER per-endpoint 10/15min
+  // buckets on top for login/register/resend/reset-request.
+  const writeLimiter = createRateLimiter({ limit: 60, windowMs: 60_000 })
+  app.use('/api', (req, res, next) => {
+    if (req.method === 'POST' || req.method === 'PATCH' || req.method === 'PUT' || req.method === 'DELETE') {
+      return writeLimiter.middleware(req, res, next)
+    }
+    next()
+  })
+
   // Unauthenticated liveness probes — registered before any auth middleware so
   // load balancers / health checks never need a token.
   app.get('/health', (_req, res) => {
@@ -70,7 +83,14 @@ export function createApp({ pool = defaultPool, logger = console, fetchImpl = gl
     res.json({ ok: true, uptime: process.uptime() })
   })
 
-  app.use('/api/auth', createAuthRouter({ pool }))
+  const authRouter = createAuthRouter({ pool })
+  // Test harness / restart hook: clear the strict auth buckets without needing a
+  // fresh app instance. No-op in production.
+  if (typeof authRouter.resetRateLimiters === 'function') {
+    app.locals.resetAuthRateLimiters = () => authRouter.resetRateLimiters()
+  }
+  app.use('/api/auth', authRouter)
+  app.use('/api/operator', createOperatorRouter({ pool }))
   app.use('/api/requests', createRequestsRouter({ pool }))
   app.use('/api/listings', createListingsRouter({ pool }))
   app.use('/api/deals', createDealsRouter({ pool }))

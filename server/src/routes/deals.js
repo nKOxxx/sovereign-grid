@@ -22,6 +22,7 @@ import { Router } from 'express'
 import { z } from 'zod'
 import { requireRole } from '../middleware/roles.js'
 import { requireAuth } from '../middleware/auth.js'
+import { requireVerified } from '../middleware/verified.js'
 import { withUser } from '../db/pool.js'
 
 const DEAL_STATUSES = [
@@ -92,7 +93,7 @@ export function createDealsRouter({ pool }) {
   // match_listings_for_match(). withUser supplies the buyer audit context. No
   // audit trigger fires on deal INSERT (0001 audits status UPDATEs + approvals
   // only) — noted rather than adding a migration.
-  router.post('/accept', requireRole('buyer'), async (req, res, next) => {
+  router.post('/accept', requireRole('buyer'), requireVerified(), async (req, res, next) => {
     try {
       const body = acceptSchema.parse(req.body)
       const { rows } = await withUser(req.user.id, 'buyer', async (c) => {

@@ -41,7 +41,7 @@ export function requireAuth({ pool } = {}) {
       return
     }
 
-    req.user = { id: session.userId, role: session.role }
+    req.user = { id: session.userId, role: session.role, emailVerified: session.emailVerified }
     req.token = match[1]
     next()
   }

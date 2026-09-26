@@ -26,6 +26,7 @@ import { createPool, withUser } from '../src/db/pool.js'
 import { createApp } from '../src/app.js'
 import { createSession } from '../src/auth/sessions.js'
 import { createScratchDb, dropScratchDb } from './helpers/db.js'
+import { registerVerified } from './helpers/verification.js'
 
 let scratch
 let appPool
@@ -117,7 +118,8 @@ describe('listing review gate', () => {
   let listingId
 
   beforeAll(async () => {
-    const seller = await register('seller', 'gateseller@sg.test')
+    // Seller must be email-verified before it can create a listing (gated action).
+    const seller = await registerVerified(api, { email: 'gateseller@sg.test', role: 'seller' })
     sellerToken = seller.json.token
     sellerId = seller.json.user.id
 

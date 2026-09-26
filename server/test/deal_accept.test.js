@@ -23,6 +23,7 @@ import { createPool, withUser } from '../src/db/pool.js'
 import { createApp } from '../src/app.js'
 import { createSession } from '../src/auth/sessions.js'
 import { createScratchDb, dropScratchDb } from './helpers/db.js'
+import { registerVerified } from './helpers/verification.js'
 
 let scratch
 let appPool
@@ -94,12 +95,6 @@ afterAll(async () => {
   await dropScratchDb(scratch.dbName)
 })
 
-async function register(role, email) {
-  return api('POST', '/api/auth/register', {
-    body: { email, password: 'supersecret123', role, displayName: role },
-  })
-}
-
 /** Create a listing (always lands 'pending'); returns the listing row. */
 async function createPendingListing(sellerToken, name) {
   const res = await api('POST', '/api/listings', {
@@ -128,11 +123,20 @@ describe('buyer offer-acceptance', () => {
   let listingId
 
   beforeAll(async () => {
-    const seller = await register('seller', 'accseller@sg.test')
+    // Seller must be email-verified to create a listing; buyer to accept one.
+    const seller = await registerVerified(api, {
+      email: 'accseller@sg.test',
+      role: 'seller',
+      displayName: 'seller',
+    })
     sellerToken = seller.json.token
     sellerId = seller.json.user.id
 
-    const buyer = await register('buyer', 'accbuyer@sg.test')
+    const buyer = await registerVerified(api, {
+      email: 'accbuyer@sg.test',
+      role: 'buyer',
+      displayName: 'buyer',
+    })
     buyerToken = buyer.json.token
     buyerId = buyer.json.user.id
 

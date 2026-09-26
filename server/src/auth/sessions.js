@@ -52,14 +52,18 @@ export async function createSession(userId, role, pool = defaultPool) {
  * Resolve a bearer token to its owner, or null if invalid/expired.
  * @param {string} token
  * @param {import('pg').Pool} [pool]
- * @returns {Promise<{userId: string, role: string}|null>}
+ * @returns {Promise<{userId: string, role: string, emailVerified: boolean}|null>}
  */
 export async function verifySession(token, pool = defaultPool) {
   if (!token || typeof token !== 'string') return null
   const hash = sha256(token)
   const { rows } = await pool.query('SELECT * FROM auth_session_by_hash($1)', [hash])
   if (!rows.length) return null
-  return { userId: rows[0].user_id, role: rows[0].role }
+  return {
+    userId: rows[0].user_id,
+    role: rows[0].role,
+    emailVerified: rows[0].email_verified === true,
+  }
 }
 
 /**
