@@ -56,3 +56,12 @@ Fixes the G2 miss: Fee Engine shipped on default light styling inside the dark a
 - Applied: full token reskin (canvas/surface/text ladders, single azure accent), custom Select on all 4 (added disabled prop), sg-num on every figure, gridlines rgba(255,255,255,.06), Inter+JetBrains Mono self-hosted (Fontsource, CSP-clean).
 - Gates: 153/153 vitest (3 new design-guard tests: zero native selects, zero light-theme classes, sg-num/sg-card/sg-display present), 26/26 e2e, fonts.check true, body bg #0a0a0b, 0 console errors.
 - Rule going forward: world-class-frontend skill loads on ANY Sovereign Grid UI change; new screens render through .sg-* tokens only.
+
+## Successor service cutover (2026-09-26 morning) — clean URL solved
+- Render create-endpoint recovered (400 validation ≠ 500 outage). Recipe from DEPLOY.md executed.
+- Renamed old svc → `sovereign-grid-legacy`; created successor (docker/free/oregon, same repo+DB,
+  fresh SESSION_SECRET — old secret retired, closes item 3). Name collision forced suffix:
+  primary = https://sovereign-grid-o707.onrender.com (immutable suffix).
+- Verified vs new prod: golden 6/6, e2e 26/26, /api/health 200 on 1bccad6.
+- rotate_render_db.sh repointed to new SID/URL; `check` green (29 days left); cron sg_watch.sh inherits.
+- Legacy zzxu left running as fallback during burn-in; pause/delete after 24-48h.

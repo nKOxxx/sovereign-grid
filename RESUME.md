@@ -10,8 +10,8 @@ fee flow, partner split, live policy) — the thing that turns listing prices in
 a platform fee and 93/90/87 golden outcome.
 
 ## Where it runs
-- **Public:** https://sovereign-grid-zzxu.onrender.com — Render free web svc (docker runtime),
-  ~50 s cold start after 15 min idle, no card, never expires.
+- **Public:** https://sovereign-grid-o707.onrender.com — Render free web svc (docker runtime),
+  ~50 s cold start (svc srv-darmnvrncjis73e9c8jg; zzxu=legacy fallback) after 15 min idle, no card, never expires.
 - **Local:** from repo root:
   ```
   npm run build   # if dist/ is stale (design pass b354e19 ships self-hosted fonts into dist)

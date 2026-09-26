@@ -7,7 +7,7 @@
 # restore, swap the app's DATABASE_URL env var, redeploy, verify, and retire
 # the old DB.
 #
-# Hosting: the app runs as a Render FREE WEB SERVICE (srv-dar8u8id0e5s73bucs30,
+# Hosting: the app runs as a Render FREE WEB SERVICE (srv-darmnvrncjis73e9c8jg (successor, primary since 9/26),
 # https://sovereign-grid-zzxu.onrender.com) — free web services do NOT expire
 # (unlike free Postgres) and need no card. Fly was retired 2026-09-25 (trial
 # ended; app remains there but is suspended and unused).
@@ -46,8 +46,8 @@ EOF
 API=https://api.render.com/v1
 OLD_URL_FILE=/tmp/sg_render_ext.txt
 NEW_URL_FILE=/tmp/sg_render_ext_next.txt
-RENDER_SID=srv-dar8u8id0e5s73bucs30          # web service sovereign-grid-zzxu
-RENDER_URL=https://sovereign-grid-zzxu.onrender.com
+RENDER_SID=srv-darmnvrncjis73e9c8jg          # web service sovereign-grid-o707 (successor, primary since 9/26)
+RENDER_URL=https://sovereign-grid-o707.onrender.com
 DB_ID=dpg-dar1o0g473hc739h2ut0-a
 
 log() { echo "[$(date -u +%H:%M:%S)] $*"; }
