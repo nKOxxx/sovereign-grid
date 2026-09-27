@@ -59,3 +59,17 @@ SG_E2E_BASE=http://127.0.0.1:8787 SG_OP_TOKEN="$TOKEN" python3 e2e/golden_live.p
 1. Successor Render service for a clean URL — blocked on Render create-endpoint outage (retry per DEPLOY.md).
 2. Real sellers / partner thread follow-ups (non-code, user's leads).
 3. Old SESSION_SECRET rotation (dies with old service anyway).
+
+## Flight-loop update (2026-09-27)
+- Wave O SHIPPED (fd135a8, live on prod): Azure Retail Prices ingest —
+  211 indicative rows (H100/A100/H200/MI300X), docs-verified GPU-count map,
+  recurring via sg_ingest.sh (now both sources, 6h). Ledger: BUILD_LEDGER.md
+  "Wave O". Floors now: server 180/180 · root 195/195 · e2e 26/26 · golden 6/6.
+- Subdomain live with own cert: https://sovereign-grid.nikolastojanow.com
+  (use this URL in partner material going forward; onrender URL still works).
+- Pages apex cert (nikolastojanow.com) still in GitHub's issuance queue —
+  DNS verified, left alone; self-lands. Check with: curl -svI https://nikolastojanow.com
+- Open items updated: successor-service item MOOT (custom domain covers it);
+  next ingest candidate = AWS bulk index (verify SKU→GPU counts first).
+- Outreach: targets vetted + openers written (docs/OUTREACH_TARGETS.md);
+  NO send channel on this Mac (no mail client/creds) — sends need user.
