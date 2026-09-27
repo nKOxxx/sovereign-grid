@@ -25,6 +25,8 @@ import { createSession } from '../src/auth/sessions.js'
 import { createScratchDb, dropScratchDb } from './helpers/db.js'
 import {
   createIntelRouter, familyForAccel, VAST_ALLOWLIST, VAST_ALLOWLIST_RE,
+  AZURE_GPU_COUNTS, isAzureDedicatedLinuxPayg, acceleratorForAzureSku,
+  regionForAzureRegion,
 } from '../src/routes/intel.js'
 import { acceleratorFamily } from '../../src/lib/deal.js'
 
@@ -298,5 +300,153 @@ describe('family-map sync (JS map == SQL helper == lib acceleratorFamily)', () =
 
   it('createIntelRouter is exported for the app factory wiring', () => {
     expect(typeof createIntelRouter).toBe('function')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Azure Retail Prices ingest — fixture captured live 2026-09-27
+// (armSkuName eq 'Standard_NC40ads_H100_v5', unmodified). GPU counts in
+// AZURE_GPU_COUNTS were verified against Microsoft Learn size-series docs the
+// same day; see the comment block on the map in intel.js.
+// ---------------------------------------------------------------------------
+describe('POST /api/intel/ingest/azure — fixture-based, verified counts, dedupe', () => {
+  let opToken
+  let azUrl
+  let azSrv
+  const bySku = {}
+
+  // The captured fixture is loaded at collection time (plain file read — no
+  // network); the stubbed app is wired in beforeAll.
+  bySku.Standard_NC40ads_H100_v5 = JSON.parse(
+    readFileSync(new URL('./fixtures/azure_sample.json', import.meta.url), 'utf8'),
+  )
+
+  beforeAll(async () => {
+    opToken = (await createSession(opId, 'operator', appPool)).token
+    const azApp = createApp({ pool: appPool, fetchImpl: mkAzureStub(bySku) })
+    azSrv = await listenExpress(azApp)
+    azUrl = baseUrl(azSrv)
+  })
+  afterAll(async () => {
+    await new Promise((r) => azSrv.close(r))
+  })
+
+  // URL-aware stub: the route issues one request per SKU in AZURE_GPU_COUNTS;
+  // return the fixture only for the SKU it captured, empty pages otherwise.
+  function mkAzureStub(map) {
+    return async (url) => {
+      const m = /armSkuName%20eq%20'([^']+)'/.exec(String(url))
+      const sku = m ? m[1] : ''
+      return { ok: true, status: 200, json: async () => map[sku] || { Items: [] } }
+    }
+  }
+
+  const azureFixture = bySku.Standard_NC40ads_H100_v5
+  const eligible = azureFixture.Items.filter(
+    (r) => AZURE_GPU_COUNTS[r.armSkuName] && isAzureDedicatedLinuxPayg(r),
+  )
+
+  async function azApi(method, path, { token, body } = {}) {
+    const headers = { 'Content-Type': 'application/json' }
+    if (token) headers.Authorization = `Bearer ${token}`
+    const res = await fetch(`${azUrl}${path}`, {
+      method,
+      headers,
+      body: method === 'GET' ? undefined : JSON.stringify(body ?? {}),
+    })
+    return { status: res.status, json: await res.json() }
+  }
+
+  it('the captured fixture contains eligible rows (guard against silent drift)', () => {
+    expect(azureFixture.Items.length).toBeGreaterThan(200)
+    // NC40ads_H100_v5 = 1 GPU: every dedicated Linux PAYG row in the fixture
+    // is priced as-is (price == retailPrice).
+    expect(eligible.length).toBeGreaterThan(15)
+    expect(eligible.every((r) => r.armSkuName === 'Standard_NC40ads_H100_v5')).toBe(true)
+  })
+
+  it('ingests the fixture: correct inserted count and a real uaenorth price', async () => {
+    const res = await azApi('POST', '/api/intel/ingest/azure', { token: opToken })
+    expect(res.status).toBe(200)
+    expect(res.json.inserted).toBe(eligible.length)
+    expect(res.json.updated).toBe(0)
+
+    const pub = await api('GET', '/api/intel/observations')
+    const az = pub.json.observations.filter((o) => o.source === 'azure')
+    expect(az.length).toBe(eligible.length)
+    expect(az.every((o) => o.level === 'Indicative' && o.unit === 'usd/accel-hr')).toBe(true)
+    expect(az.every((o) => o.accelerator === 'H100' && o.family === 'H100')).toBe(true)
+
+    // uaenorth -> GCC; NC40ads_H100_v5 is a 1-GPU VM so price passes through.
+    const uae = eligible.find((r) => r.armRegionName === 'uaenorth')
+    const uaeRow = az.find((o) => o.source_ref === `Standard_NC40ads_H100_v5:${uae.meterName}:uaenorth:Consumption`)
+    expect(Number(uaeRow.price)).toBeCloseTo(Number(uae.retailPrice), 10)
+    expect(uaeRow.region).toBe('GCC')
+    // westeurope -> EU.
+    const we = az.find((o) => o.region === 'EU')
+    expect(we).toBeTruthy()
+  })
+
+  it('second run of the SAME fixture -> 0 inserted, N updated (dedupe holds)', async () => {
+    const res = await azApi('POST', '/api/intel/ingest/azure', { token: opToken })
+    expect(res.status).toBe(200)
+    expect(res.json.inserted).toBe(0)
+    expect(res.json.updated).toBe(eligible.length)
+    const pub = await api('GET', '/api/intel/observations')
+    expect(pub.json.observations.filter((o) => o.source === 'azure').length).toBe(eligible.length)
+  })
+
+  it('multi-GPU SKUs divide by the verified count; Windows/Spot/LowPri/DevTest/unknown skip', async () => {
+    const synthetic = {
+      Items: [
+        // ND96isr_H200_v5 (8 GPUs, verified): dedicated Linux PAYG in westeurope.
+        { armSkuName: 'Standard_ND96isr_H200_v5', skuName: 'Standard ND96isr H200 v5', meterName: 'ND96isr H200 v5', armRegionName: 'westeurope', retailPrice: 24.0, unitOfMeasure: '1 Hour', currencyCode: 'USD', type: 'Consumption', productName: 'Virtual Machines ND H200 v5 Series' },
+        // Same SKU, but Windows rate -> skip.
+        { armSkuName: 'Standard_ND96isr_H200_v5', skuName: 'Standard ND96isr H200 v5', meterName: 'ND96isr H200 v5 Windows', armRegionName: 'westeurope', retailPrice: 28.0, unitOfMeasure: '1 Hour', currencyCode: 'USD', type: 'Consumption', productName: 'Virtual Machines ND H200 v5 Series Windows' },
+        // Spot -> skip.
+        { armSkuName: 'Standard_ND96isr_H200_v5', skuName: 'ND96isr H200 v5 Spot', meterName: 'ND96isr H200 v5 Spot', armRegionName: 'westeurope', retailPrice: 9.0, unitOfMeasure: '1 Hour', currencyCode: 'USD', type: 'Consumption', productName: 'Virtual Machines ND H200 v5 Series' },
+        // Unknown SKU (not in the verified map) -> skip even though the row is clean.
+        { armSkuName: 'Standard_NC999ads_H999_v9', skuName: 'Standard NC999ads H999 v9', meterName: 'NC999ads H999 v9', armRegionName: 'eastus', retailPrice: 5.0, unitOfMeasure: '1 Hour', currencyCode: 'USD', type: 'Consumption', productName: 'Virtual Machines NCH999v9 Series' },
+        // Reservation -> skip.
+        { armSkuName: 'Standard_NC24ads_A100_v4', skuName: 'Standard NC24ads A100 v4', meterName: 'NC24ads A100 v4', armRegionName: 'eastus', retailPrice: 1.2, unitOfMeasure: '1 Hour', currencyCode: 'USD', type: 'Reservation', productName: 'Virtual Machines NC A100 v4 Series' },
+      ],
+    }
+    const app2 = createApp({ pool: appPool, fetchImpl: mkAzureStub({ Standard_ND96isr_H200_v5: synthetic }) })
+    const srv = await listenExpress(app2)
+    try {
+      const res = await fetch(`${baseUrl(srv)}/api/intel/ingest/azure`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${opToken}` },
+        body: '{}',
+      })
+      const json = await res.json()
+      expect(json.inserted).toBe(1) // only the clean H200 row
+      expect(json.updated).toBe(0)
+      expect(json.skipped).toBe(4)
+
+      const pub = await api('GET', '/api/intel/observations')
+      const h200 = pub.json.observations.find(
+        (o) => o.source === 'azure' && o.accelerator === 'H200' && o.region === 'EU',
+      )
+      expect(Number(h200.price)).toBeCloseTo(24.0 / 8, 10) // $3.00/accel-hr
+      expect(h200.family).toBe('H200')
+      // The unknown SKU must have produced NO row.
+      expect(pub.json.observations.some((o) => String(o.source_ref).includes('H999'))).toBe(false)
+    } finally {
+      await new Promise((r) => srv.close(r))
+    }
+  })
+
+  it('unit guards: acceleratorForAzureSku + regionForAzureRegion', () => {
+    expect(acceleratorForAzureSku('Standard_NC40ads_H100_v5')).toBe('H100')
+    expect(acceleratorForAzureSku('Standard_ND96isr_MI300X_v5')).toBe('MI300X')
+    expect(acceleratorForAzureSku('Standard_D4s_v5')).toBe(null)
+    expect(regionForAzureRegion('uaenorth')).toBe('GCC')
+    expect(regionForAzureRegion('westeurope')).toBe('EU')
+    expect(regionForAzureRegion('switzerlandnorth')).toBe('EU')
+    expect(regionForAzureRegion('eastus2')).toBe('US')
+    expect(regionForAzureRegion('jioindiawest')).toBe('Asia')
+    expect(regionForAzureRegion('australiaeast')).toBe('Global')
+    expect(regionForAzureRegion('')).toBe('Global')
   })
 })

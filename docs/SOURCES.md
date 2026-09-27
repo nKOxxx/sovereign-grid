@@ -9,6 +9,7 @@ level (Indicative / Quoted / Transacted) with a minimum-observation gate.
 | Source | Level | Method | Cadence | Status |
 |---|---|---|---|---|
 | **vast.ai** bundles API (`console.vast.ai/api/v0/bundles/`) | Indicative | `POST /api/intel/ingest/vast` (operator) | cron `sg-vast-ingest` every 6h | ✅ LIVE — first rows in prod 2026-09-26 |
+| **Azure Retail Prices** (`prices.azure.com/api/retail/prices`) | Indicative | `POST /api/intel/ingest/azure` (operator) | cron `sg-vast-ingest` every 6h (both sources) | ✅ LIVE — 211 rows in prod 2026-09-27 |
 | Curated manual entry | Quoted / Transacted | `POST /api/intel/observations` (operator) | as observed | ✅ LIVE |
 
 Notes on vast.ai: public, no auth. Datacenter allowlist only (H100/H200/H800/
@@ -19,6 +20,16 @@ This is acceptable index semantics at Indicative level (churn ≈ availability
 weighting). Aggregation by family (0008 taxonomy: H100/A100/H200/B200/GB200/
 L40S/MI300X/TPU/Ascend) keeps cells meaningful.
 
+Notes on Azure: public, no auth. The route issues one small query PER SKU in
+`AZURE_GPU_COUNTS` (intel.js) — a **docs-verified** map of SKU → GPU count
+(ND96isr H100/H200/MI300X = 8; NC40ads H100 = 1; NC80adis H100 = 2; NC A100 v4
+24/48/96ads = 1/2/4; verified against Microsoft Learn accelerators tables
+2026-09-27). Only Dedicated Linux PAYG rows in USD are priced (Consumption,
+no Windows/Spot/Low Priority/DevTest/Reservation). Per-VM retail price is
+divided by the verified GPU count — an unknown SKU is SKIPPED, never priced
+(house rule: no guessed per-GPU math). Dedupe: source_ref =
+`sku:meter:region:type`. Adding a SKU requires a fresh docs verification.
+
 ## Verified reachable, not yet ingested (next candidates)
 
 1. **Azure Retail Prices API** — `prices.azure.com/api/retail/prices`
@@ -28,7 +39,9 @@ L40S/MI300X/TPU/Ascend) keeps cells meaningful.
    ÷ gpu_count. Map level=Indicative, source='azure'.
 2. **AWS bulk pricing index** — `pricing.us-east-1.amazonaws.com/offers/v1.0/aws/`
    (public S3). VERIFIED index reachable. Heavier: per-region CSV/JSON per SKU
-   class; build a P5/P4e/p5 extractor when needed.
+   class; build a P5/P4e/p5 extractor when needed. Same evidence law as Azure:
+   SKU → GPU count must be verified from AWS docs before any division; unknown
+   SKUs are skipped, never priced.
 3. **Tensordock** — old marketplace endpoint 404s; check their current API or
    scrape-lite before relying on it. NOT verified.
 

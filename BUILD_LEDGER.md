@@ -106,3 +106,28 @@ Fixes the G2 miss: Fee Engine shipped on default light styling inside the dark a
 - Dispatch sg-p1-waveN-001 FAILED (attempts=2, worker died post-code/pre-report); hub verified the tree instead: server 175/175 (+21), root 195/195, build ✓; 0010 applied to prod cleanly (ledger id=11).
 - LIVE PROOF (prod): register→operator-reveal→verify→login → listing→approve→accept → seller:commercially_agreed → buyer:contracted → observation landed (H200 EU $2.15/accel-hr, level Transacted, public in /api/intel/observations); wrong-party 403, illegal-jump 409 verified on prod. Proof listing retired; proof deal 8ee17966-8841-4c08-8aac-18e4a8873c04 retained as the first Transacted record.
 - Ops: sg_heartbeat.sh (health + ingest freshness, silent-when-healthy) cron 'sg-prod-heartbeat' every 30m → Home. Commits 9bebbf6 (M), 0b1d448 (N).
+
+## Wave O — Azure Retail Prices ingest (2026-09-27, flight loop, hub-direct)
+- POST /api/intel/ingest/azure (mirror of vast: operator-only, 15s timeout per
+  request, upsert by (source, source_ref)). Per-SKU queries for SKUs in
+  AZURE_GPU_COUNTS — a docs-verified SKU→GPU-count map (Microsoft Learn
+  accelerators tables, verified 2026-09-27): ND96isr H100/H200/MI300X = 8,
+  NC40ads H100 = 1, NC80adis H100 = 2, NC A100 v4 24/48/96ads = 1/2/4.
+  Unknown SKU ⇒ skipped, NEVER priced (house rule: no guessed per-GPU math).
+- Filter law: Consumption + USD + "1 Hour", reject Windows/Spot/Low
+  Priority/DevTest/Reservation. Dedupe ref: sku:meter:region:type.
+- Fixture server/test/fixtures/azure_sample.json captured live 2026-09-27
+  (NC40ads H100 v5, 283 rows); intel tests 13 → 18 (eligible-count drift
+  guard, insert+price+region checks, dedupe, synthetic multi-GPU ÷8,
+  Windows/Spot/unknown/Reservation skips, unit guards).
+- Floors: server 180/180 (+5), root 195/195, e2e 26/26, golden 6/6.
+- LIVE (prod, pre-deploy via local server on prod DB): 211 azure rows —
+  families H100 82 / A100 81 / H200 31 / MI300X 17; regions EU 68 / US 62 /
+  Asia 46 / GCC 5 / Global 30 (all genuinely non-core: AU/CA/BR/ZA/MX/usgov).
+  Spot-check: uaenorth NC80adis H100 $35.15/VM ÷ 2 = $17.57/accel-hr ✓.
+- Ops: ~/.hermes/scripts/sg_ingest.sh now ingests vast + azure each run;
+  cron sg-vast-ingest 6h cadence unchanged. Next candidate: AWS bulk index
+  (same evidence law — verify SKU→GPU counts before any division).
+- Cert: Pages apex cert still provisioning (https_enrolled is read-only via
+  REST; DNS correct since 9/26 — left in GitHub's queue). Render subdomain
+  cert CONFIRMED live (sovereign-grid.nikolastojanow.com, GTS WE1, health 200).

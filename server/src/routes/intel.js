@@ -15,6 +15,15 @@
 //                                              default globalThis.fetch); 15s timeout;
 //                                              datacenter allowlist filter; upsert by
 //                                              (source, source_ref) so repeats dedupe.
+//   POST /api/intel/ingest/azure    operator — ingest the Azure Retail Prices API
+//                                              (public, no auth). Per-SKU queries for
+//                                              a FIXED map of SKUs whose datacenter
+//                                              GPU counts were verified against
+//                                              Microsoft Learn (2026-09-27). Dedicated
+//                                              Linux PAYG rows only (Consumption,
+//                                              USD, no Windows, no Spot/Low Priority).
+//                                              Unknown SKU -> skipped, NEVER priced
+//                                              (house rule: no guessed per-GPU math).
 //
 // House law: never a live market price. Every row is a dated, evidence-specific
 // observation feeding an indicative index. Ingested rows are level='Indicative'
@@ -27,6 +36,74 @@ import { requireRole } from '../middleware/roles.js'
 import { withUser } from '../db/pool.js'
 
 export const VAST_BUNDLES_URL = 'https://console.vast.ai/api/v0/bundles/'
+
+// ---------------------------------------------------------------------------
+// Azure Retail Prices ingest (verified 2026-09-27).
+//
+// AZURE_GPU_COUNTS maps the only armSkuName values we will ever price. Each
+// count was read from the "Accelerator (GPUs, FPGAs, etc.)" table on the
+// corresponding learn.microsoft.com size-series page (docs pulled and checked
+// the same day). Adding a SKU REQUIRES a fresh docs verification — do not
+// infer counts from SKU names, marketing pages, or other clouds.
+//
+//   ND H100 v5  https://learn.microsoft.com/en-us/azure/virtual-machines/sizes/gpu-accelerated/nd-h100-v5-series   (ND96isr_H100_v5 = 8)
+//   ND H200 v5  https://learn.microsoft.com/en-us/azure/virtual-machines/sizes/gpu-accelerated/nd-h200-v5-series   (ND96isr_H200_v5 = 8)
+//   ND MI300X v5 https://learn.microsoft.com/en-us/azure/virtual-machines/sizes/gpu-accelerated/nd-mi300x-v5-series (ND96isr_MI300X_v5 = 8)
+//   NCads H100 v5 https://learn.microsoft.com/en-us/azure/virtual-machines/sizes/gpu-accelerated/ncadsh100v5-series (NC40ads=1, NC80adis=2)
+//   NC A100 v4  https://learn.microsoft.com/en-us/azure/virtual-machines/sizes/gpu-accelerated/nca100v4-series      (24ads=1, 48ads=2, 96ads=4)
+// ---------------------------------------------------------------------------
+export const AZURE_PRICES_URL = 'https://prices.azure.com/api/retail/prices'
+export const AZURE_GPU_COUNTS = Object.freeze({
+  Standard_ND96isr_H100_v5: 8,
+  Standard_ND96isr_H200_v5: 8,
+  Standard_ND96isr_MI300X_v5: 8,
+  Standard_NC40ads_H100_v5: 1,
+  Standard_NC80adis_H100_v5: 2,
+  Standard_NC24ads_A100_v4: 1,
+  Standard_NC48ads_A100_v4: 2,
+  Standard_NC96ads_A100_v4: 4,
+})
+
+/**
+ * True when a Retail Prices row is the evidence we want: Dedicated (pay as you
+ * go) Linux meter in USD. Anything else (Reservations, DevTest, Spot, Low
+ * Priority, Windows rates, non-USD) is rejected.
+ */
+export function isAzureDedicatedLinuxPayg(row) {
+  return Boolean(row)
+    && row.type === 'Consumption'
+    && row.currencyCode === 'USD'
+    && row.unitOfMeasure === '1 Hour'
+    && !/windows/i.test(String(row.productName || ''))
+    && !/spot|low priority/i.test(String(row.skuName || ''))
+    && Number.isFinite(Number(row.retailPrice))
+    && Number(row.retailPrice) > 0
+}
+
+/**
+ * acceleratorForAzureSku('Standard_NC40ads_H100_v5') -> 'H100'.
+ * Returns null for SKUs outside the verified map (caller must skip, never
+ * guess a GPU count).
+ */
+export function acceleratorForAzureSku(sku) {
+  const m = /(H100|H200|MI300X|A100)/.exec(String(sku || ''))
+  return m ? m[1] : null
+}
+
+/**
+ * Azure armRegionName ("westeurope", "uaenorth", "southcentralus") -> SG region.
+ * Azure US regions all end in "us" or "us<N>" (eastus, westus2, centralus...);
+ * guard against substrings like "aus".
+ */
+export function regionForAzureRegion(armRegion) {
+  const r = String(armRegion || '').trim().toLowerCase()
+  if (!r) return 'Global'
+  if (/us$|us\d/.test(r) && !/aus|rus/.test(r)) return 'US'
+  if (/uaenorth|uaecentral|qatarcentral/.test(r)) return 'GCC'
+  if (/(germany|france|netherlands|sweden|switzerland|norway|europe|uk|poland|italy|spain|belgium|austria|denmark|finland|ireland|portugal|greece)/.test(r)) return 'EU'
+  if (/(israel|jioindia|centralindia|southindia|westindia|korea|japan|southeastasia|eastasia|malaysia|indonesia|thailand|vietnam|taiwan|hongkong|china)/.test(r)) return 'Asia'
+  return 'Global'
+}
 
 // Datacenter-accelerator allowlist. Only offers whose gpu_name matches are
 // ingested; consumer cards (RTX/V100/... ) are skipped. Verified against the
@@ -195,6 +272,74 @@ export function createIntelRouter({ pool, fetchImpl = globalThis.fetch }) {
           )
           // xmax: 0 on a fresh insert, non-zero after the conflict-update path.
           if (rows[0] && rows[0].inserted === true) inserted += 1
+          else updated += 1
+        }
+        return { inserted, updated, skipped }
+      }, pool)
+
+      res.status(200).json(result)
+    } catch (err) {
+      next(err)
+    }
+  })
+
+  // POST /api/intel/ingest/azure — ingest the verified Azure Retail Prices
+  // source. One small query per SKU in the verified GPU-count map (the API
+  // supports armSkuName filters; 8 targeted GETs beat paginating a firehose).
+  // Only rows passing isAzureDedicatedLinuxPayg() are priced, and only SKUs in
+  // AZURE_GPU_COUNTS are ever divided — unknown SKU => skipped, no guesses.
+  router.post('/ingest/azure', async (req, res, next) => {
+    try {
+      const rows = []
+      for (const sku of Object.keys(AZURE_GPU_COUNTS)) {
+        const ctrl = new AbortController()
+        const timer = setTimeout(() => ctrl.abort(), 15000)
+        try {
+          const filter = `serviceName eq 'Virtual Machines' and armSkuName eq '${sku}'`
+          const url = `${AZURE_PRICES_URL}?$filter=${encodeURIComponent(filter)}`
+          const resp = await fetchImpl(url, {
+            headers: { Accept: 'application/json' },
+            signal: ctrl.signal,
+          })
+          if (!resp.ok) {
+            throw new Error(`azure retail prices responded ${resp.status}`)
+          }
+          const payload = await resp.json()
+          if (payload && Array.isArray(payload.Items)) rows.push(...payload.Items)
+        } finally {
+          clearTimeout(timer)
+        }
+      }
+
+      const result = await withUser(req.user.id, 'operator', async (c) => {
+        let inserted = 0
+        let updated = 0
+        let skipped = 0
+        for (const row of rows) {
+          const sku = String(row.armSkuName || '')
+          const gpuCount = AZURE_GPU_COUNTS[sku]
+          if (!gpuCount || !isAzureDedicatedLinuxPayg(row)) {
+            skipped += 1
+            continue
+          }
+          const accel = acceleratorForAzureSku(sku)
+          // retailPrice is per-VM-hour; the count is a docs-verified constant.
+          const price = Number(row.retailPrice) / gpuCount
+          const family = familyForAccel(accel)
+          const region = regionForAzureRegion(row.armRegionName)
+          // Per-meter-per-region ref: repeats dedupe, distinct regions coexist.
+          const sourceRef = `${sku}:${row.meterName}:${row.armRegionName}:${row.type}`
+
+          const { rows: insRows } = await c.query(
+            `INSERT INTO market_observations
+               (level, accelerator, family, region, price, unit, source, source_ref, created_by)
+             VALUES ('Indicative', $1, $2, $3, $4, 'usd/accel-hr', 'azure', $5, $6)
+             ON CONFLICT (source, source_ref) WHERE source_ref IS NOT NULL DO UPDATE
+               SET price = EXCLUDED.price, observed_at = now()
+             RETURNING (xmax = 0) AS inserted`,
+            [accel, family, region, price, sourceRef, req.user.id],
+          )
+          if (insRows[0] && insRows[0].inserted === true) inserted += 1
           else updated += 1
         }
         return { inserted, updated, skipped }
