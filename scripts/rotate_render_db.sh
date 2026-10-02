@@ -82,12 +82,24 @@ check() {
 }
 
 make_db() {
-  log "creating fresh free Postgres (oregon, v17)…"
-  render_api POST /postgres '{
-    "name": "sovereign-grid-db", "plan": "free", "version": "17",
-    "region": "oregon", "databaseName": "sovereign_grid_db",
-    "databaseUser": "sovereign_grid_db_user"
-  }' | python3 -c "import json,sys; print(json.load(sys.stdin)['id'])"
+  # 2026-10-02 rehearsal: raw POST /postgres now returns 404 (API changed since 9/25)
+  # and Render enforces "cannot have more than one active free tier database" — so the
+  # old DB must be DELETED before the new one can be created. Order inside rotate()
+  # was updated accordingly. Creation goes through the CLI (its endpoint still works).
+  log "creating fresh free Postgres (oregon, v17) via render CLI…"
+  env -u RENDER_API_KEY render postgres create \
+    --name sovereign-grid-db-next \
+    --plan free --region oregon --version 17 \
+    --database-name sovereign_grid_db \
+    --database-user sovereign_grid_db_user \
+    --confirm -o json | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+p = d.get('data', d)
+if isinstance(p, list): p = p[0]
+p = p.get('postgres', p)
+print(p['id'])
+"
 }
 
 wait_available() {
@@ -221,7 +233,19 @@ rotate() {
   DUMP="$REPO/backups/sg_pre_rotate_$STAMP.dump"
   log "dumping live DB → $DUMP"
   mkdir -p "$REPO/backups"
-  "$PG_DUMP" "$(cat "$OLD_URL_FILE")" -Fc -f "$DUMP"
+  # --schema=public: SG's own tables are RLS-on but NOT forced, so the owner dumps them
+  # cleanly. The alleadz schema co-tenant here (see co-tenancy note in RESUME.md) uses
+  # FORCE RLS, which blocks pg_dump COPY without app.tenant_id — dumping it needs the
+  # per-tenant COPY loop, handled separately; do not let it kill the SG backup.
+  "$PG_DUMP" "$(cat "$OLD_URL_FILE")" -Fc --schema=public -f "$DUMP"
+
+  # 2026-10-02: verify the dump is restorable BEFORE destroying the only free slot.
+  "$PG_RESTORE" --list "$DUMP" >/dev/null 2>&1 || die "dump failed validation (pg_restore --list) — keeping old DB"
+
+  # free-tier law (rehearsed 10/2): only ONE active free PG → old must die first.
+  # Rollback artifact from here on is the pre-rotate dump, not the live old DB.
+  log "deleting old free DB $DB_ID (dump validated; this opens the free slot)"
+  env -u RENDER_API_KEY render postgres delete "$DB_ID" --confirm
 
   NEW_ID=$(make_db)
   log "new DB: $NEW_ID"
@@ -245,6 +269,17 @@ REVOKE UPDATE, DELETE, TRUNCATE ON audit_log FROM sg_app;
 SQL
   log "restore + grants done"
 
+  # alleadz co-tenancy (discovered 10/2): alleadz.onrender.com runs its schema inside
+  # this same DB (free-tier single-slot). Its data is NOT in the public dump — recreate
+  # its schema from migrations and point it out for any data restore.
+  if [ -d ~/alleadz/server/migrations ]; then
+    log "re-creating alleadz schema (co-tenant) via its migrations…"
+    (cd ~/alleadz/server && DATABASE_URL="$NEW_ADMIN_URL" npm run --silent migrate \
+      >/tmp/sg_alleadz_migrate.log 2>&1) \
+      || log "WARNING: alleadz migration failed — see /tmp/sg_alleadz_migrate.log (alleadz prod will be broken until fixed)"
+    log "alleadz schema recreated; its data (if any) was in the deleted DB — backup separately before rotating"
+  fi
+
   OLD_SERVING=$(current_serving_url)
   [ -n "$OLD_SERVING" ] || die "could not read current DATABASE_URL from service $RENDER_SID"
   # ops handle now points at new DB admin URL
@@ -266,20 +301,16 @@ EOF
 
   if app_healthy; then
     log "health OK — now serving from $NEW_ID"
-    log "old DB $DB_ID now unused — destroy after a day of stability:"
-    log "  curl -X DELETE -H 'Authorization: Bearer \$RENDER_KEY' $API/postgres/$DB_ID"
+    log "old DB $DB_ID was deleted pre-create (free-tier single-slot law, 10/2)"
     log "dump kept at: $DUMP"
   else
-    log "health FAILED after swap — rolling back"
-    echo "$OLD_SERVING" > "$OLD_URL_FILE"
-    chmod 600 "$OLD_URL_FILE"
-    RDEP=$(swap_app_database_url "$OLD_SERVING")
-    [ -n "$RDEP" ] && wait_deploy_live "$RDEP" || sleep 90
-    if app_healthy; then
-      log "rollback OK — old DB serving; new DB $NEW_ID is garbage to delete in dashboard"
-    else
-      log "ROLLBACK ALSO FAILED — manual fix: set DATABASE_URL on service $RENDER_SID"
-    fi
+    # Old DB no longer exists (deleted pre-create), so "roll back to old" is
+    # impossible. Recovery = verify new DB data, fix the app env, redeploy.
+    log "health FAILED after swap — old DB is gone; recovering on the NEW DB"
+    log "1) check restore: pg_restore --list $DUMP vs psql \\dt on the new admin URL"
+    log "2) app env DATABASE_URL points at sg_app serving URL written to $OLD_URL_FILE"
+    log "3) manual redeploy: render deploys create $RENDER_SID --confirm"
+    log "worst case: recreate old-shaped DB and pg_restore $DUMP into it"
     exit 1
   fi
 }

@@ -43,10 +43,27 @@ SG_E2E_BASE=http://127.0.0.1:8787 SG_OP_TOKEN="$TOKEN" python3 e2e/golden_live.p
 - Render service `srv-dar8u8id0e5s73bucs30`, auto-deploy on push to main. CLI: `/opt/homebrew/bin/render` (key in ~/.render/cli.yaml [REDACTED]).
 - DB `dpg-dar1o0g473hc739h2ut0-a` = Render free Postgres, **hard expiry 2026-10-25T07:00Z** →
   rotation script `scripts/rotate_render_db.sh check|rotate|watch`, watchdog cron `bd6bc7747401` daily 09:00.
-  Snapshot: `backups/sg_prod_20260925.dump`.
+  Snapshot: `backups/sg_prod_20260925.dump` + `backups/sg_public_20261002.dump` (clean, validated 10/2).
 - Subdomain immutable (`-zzxu` stays until a successor service is created; `POST /v1/services` was 500-ing
   9/25 eve — retry steps in DEPLOY.md).
 - `/tmp/sg_render_ext.txt` (DB conn) and `/tmp` helpers die on reboot — long-term source is the Render env var.
+
+## Rotation rehearsal findings (2026-10-02, real API probes — script patched accordingly)
+1. **Raw `POST /v1/postgres` now 404s** (API changed since 9/25). `make_db` now shells out to
+   `render postgres create … --confirm -o json` (works).
+2. **Free tier = ONE active free PG.** Create with the old DB alive → 400
+   "cannot have more than one active free tier database". Rotate() now: dump →
+   `pg_restore --list` validate → DELETE old (`render postgres delete --confirm`) →
+   create new → restore. Rollback artifact = the validated pre-rotate dump, NOT the old DB.
+3. **Dumps must be `--schema=public`**: SG tables are RLS-on but not FORCED (owner dumps fine);
+   the co-tenant `alleadz` schema is FORCE-RLS and blocks pg_dump COPY without app.tenant_id.
+4. **alleadz co-tenancy**: alleadz.onrender.com's DATABASE_URL points at THIS DB (free-PG-1
+   limit). Rotation now re-runs alleadz migrations into the new DB after restore. alleadz
+   DATA (if any) is NOT backed up by this script — export separately before rotating.
+5. **App env drifted from role separation**: service DATABASE_URL is currently the
+   `sovereign_grid_db_user` (admin) URL, not the `sg_app` serving URL from 9/25. Restore of
+   proper role separation is a pending fix; rotation's swap writes a proper sg_app URL.
+6. `/tmp/sg_render_ext.txt` regenerated 10/2 from the service env-var API (that path works).
 
 ## Rules that must survive the restart
 - **NO PAID HOSTING** (binding). Free tier only.
