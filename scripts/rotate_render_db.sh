@@ -319,17 +319,14 @@ case "${1:-}" in
   check) check ;;
   rotate) rotate ;;
   watch)
-    # Silent-when-healthy watchdog: app health + expiry days. Output/nonzero
-    # exit only on trouble — safe for a daily cron with no-agent delivery.
+    # Silent-when-healthy watchdog. 2026-10-07: DB of record moved to NEON
+    # (never expires; hosts BOTH alleadz and SG) — the Render-expiry half is
+    # retired; DB_ID now names the retained fallback DB and is not monitored.
+    # App health only; pages-cert check stays in the cron wrapper above.
     if ! app_healthy; then
-      echo "SG ALERT: app unhealthy — $RENDER_URL (Render free tier cold-starts after 15m idle; if alert repeats hourly, investigate)"
+      echo "SG ALERT: app unhealthy — $RENDER_URL (cold start ~50s after 15m idle; if alert repeats, investigate)"
       exit 1
     fi
-    LEFT=$(days_left)
-    python3 -c "import sys; sys.exit(0 if float('$LEFT') > 7 else 9)" || {
-      echo "SG ALERT: Render DB expires in ${LEFT} days — run scripts/rotate_render_db.sh rotate (or add a card + upgrade in the Render dashboard)"
-      exit 9
-    }
     ;;
   *) echo "usage: $0 check|rotate|watch"; exit 2 ;;
 esac

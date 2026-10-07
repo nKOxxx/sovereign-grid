@@ -15,7 +15,7 @@ a platform fee and 93/90/87 golden outcome.
 - **Local:** from repo root:
   ```
   npm run build   # if dist/ is stale (design pass b354e19 ships self-hosted fonts into dist)
-  export DATABASE_URL="$(cat /tmp/sg_render_ext.txt)"   # [REDACTED] — never echo/cat
+  export DATABASE_URL="$(cat ~/.neon/owner.cs)"   # NEON owner CS (0600, never echo). DB of record since 2026-10-07: Neon ep-restless-mountain-b8ttit2k (us-east-1), hosts alleadz+SG; old Render dpg-dar1o0g… retained as fallback only
   export SG_STATIC_DIR=$PWD/dist PORT=8787
   caffeinate -dism node server/src/boot.js   # → http://127.0.0.1:8787
   ```
